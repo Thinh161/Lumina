@@ -4,9 +4,9 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MaterialIcons } from "@expo/vector-icons";
 
-import HomeScreen from "../screens/user/HomeScreen";
-import ProfileScreen from "../screens/user/ProfileScreen";
-import StoryDetailScreen from "../screens/common/StoryDetailScreen";
+import HomeScreen from "../screens/reader/HomeScreen";
+import ProfileScreen from "../screens/reader/ProfileScreen";
+import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
