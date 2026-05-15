@@ -7,11 +7,12 @@ import {
 	SafeAreaView,
 	ScrollView,
 	Image,
-	ActivityIndicator
+	ActivityIndicator,
+	Alert
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchStories, fetchCategories } from "../../redux_thunk/StorySlice";
+import { fetchStories, fetchCategories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
 
 const DEFAULT_STORY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
@@ -23,6 +24,37 @@ const HomeGuestScreen = ({ navigation }) => {
 		dispatch(fetchStories());
 		dispatch(fetchCategories());
 	}, [dispatch]);
+
+	const handleReadNow = async (storyId) => {
+		if (!storyId) {
+			Alert.alert("Lỗi", "Không tìm thấy truyện để đọc.");
+			return;
+		}
+
+		try {
+			const [, chapters] = await Promise.all([
+				dispatch(fetchStoryDetails(storyId)).unwrap(),
+				dispatch(fetchChapters(storyId)).unwrap(),
+			]);
+
+			const chapterList = Array.isArray(chapters) ? [...chapters] : [];
+			const firstChapter = chapterList
+				.sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0))
+				[0];
+
+			if (!firstChapter) {
+				Alert.alert("Thông báo", "Truyện chưa có chương nào.");
+				return;
+			}
+
+			navigation.navigate("ChapterRead", {
+				chapterId: firstChapter.id,
+				storyId,
+			});
+		} catch (error) {
+			Alert.alert("Lỗi", "Không thể mở chương đầu tiên.");
+		}
+	};
 
 	// Phân loại truyện ra các mục (làm logic giả định tạm: lấy 3 truyện đầu làm Mới nổi bật)
 	const featuredStories = stories.slice(0, 3);
@@ -82,7 +114,7 @@ const HomeGuestScreen = ({ navigation }) => {
 									</Text>
 									<TouchableOpacity
 										style={styles.readNowButton}
-										onPress={() => navigation.navigate("ChapterRead")}
+										onPress={() => handleReadNow(featuredStories[0]?.id)}
 									>
 										<Text style={styles.readNowText}>Đọc ngay</Text>
 									</TouchableOpacity>

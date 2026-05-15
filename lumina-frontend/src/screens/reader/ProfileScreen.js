@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
 	View,
 	Text,
@@ -7,8 +7,13 @@ import {
 	ScrollView,
 	Image,
 	TouchableOpacity,
+	Alert,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchUserProfile, logout } from "../../redux_thunk/AuthSlice";
+
+const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg";
 
 const libraryItems = [
 	{
@@ -61,7 +66,39 @@ const managementItems = [
 	},
 ];
 
-const ProfileScreen = () => {
+
+const ProfileScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
+	const { user } = useSelector((state) => state.auth);
+
+	useEffect(() => {
+		if (user?.id) {
+			dispatch(fetchUserProfile(user.id));
+		}
+	}, [dispatch, user?.id]);
+
+	const handleLogout = () => {
+		dispatch(logout());
+		const rootNavigation = navigation.getParent();
+		if (rootNavigation) {
+			rootNavigation.reset({
+				index: 0,
+				routes: [
+					{
+						name: "Guest",
+						state: { routes: [{ name: "LoginTab" }] },
+					},
+				],
+			});
+			return;
+		}
+		Alert.alert("Đăng xuất", "Bạn đã đăng xuất.");
+	};
+
+	const displayName = user?.full_name || user?.username || "Độc giả";
+	const vipLabel = user?.is_vip ? "Thành viên cao cấp" : "Thành viên thường";
+	const balanceText = user?.balance != null ? Number(user.balance).toLocaleString("vi-VN") : "0";
+	const avatarUri = user?.avatar || DEFAULT_AVATAR;
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<View style={styles.root}>
@@ -79,21 +116,15 @@ const ProfileScreen = () => {
 				>
 					<View style={styles.profileHeader}>
 						<View style={styles.avatarWrap}>
-							<Image
-								source={{
-									uri:
-										"https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg",
-								}}
-								style={styles.avatar}
-							/>
+							<Image source={{ uri: avatarUri }} style={styles.avatar} />
 							<TouchableOpacity style={styles.editAvatarButton}>
 								<MaterialIcons name="edit" size={14} color="#fff7f5" />
 							</TouchableOpacity>
 						</View>
 
 						<View style={styles.profileInfo}>
-							<Text style={styles.profileBadge}>Thành viên cao cấp</Text>
-							<Text style={styles.profileName}>Lê Minh Anh</Text>
+							<Text style={styles.profileBadge}>{vipLabel}</Text>
+							<Text style={styles.profileName}>{displayName}</Text>
 							<Text style={styles.profileQuote}>
 								"Lạc giữa những chương hồi và những giấc mơ."
 							</Text>
@@ -121,7 +152,7 @@ const ProfileScreen = () => {
 										size={20}
 										color="#8c4f3b"
 									/>
-									<Text style={styles.vipValue}>1,250</Text>
+									<Text style={styles.vipValue}>{balanceText}</Text>
 								</View>
 								<Text style={styles.vipSubtitle}>
 									Xu hiện có trong tài khoản của bạn
@@ -170,7 +201,7 @@ const ProfileScreen = () => {
 							</View>
 						</View>
 
-						<TouchableOpacity style={styles.logoutRow}>
+						<TouchableOpacity style={styles.logoutRow} onPress={handleLogout}>
 							<MaterialIcons name="logout" size={18} color="#a83836" />
 							  <Text style={styles.logoutText}>Đăng xuất khỏi tài khoản</Text>
 						</TouchableOpacity>

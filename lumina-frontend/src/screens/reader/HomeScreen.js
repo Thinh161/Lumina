@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
 	View,
 	Text,
@@ -7,66 +7,14 @@ import {
 	SafeAreaView,
 	ScrollView,
 	Image,
+	ActivityIndicator,
+	Alert,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchStories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
 
-const featuredStories = [
-	{
-		id: "main",
-		title: "Tiếng Gọi Từ Những Đồi Cát Trắng",
-		subtitle:
-			"Câu chuyện mở ra từ sa mạc trắng, nơi mỗi cơn gió mang theo một bí ẩn.",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc",
-	},
-	{
-		id: "side-1",
-		title: "Vọng Âm Của Im Lặng",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuD_b2OHlFIHZaAO-8M9G42oTOgNbbuxZp4585qi5d0XqvPRim5em2cMhHG4aIg8osqb2v5u2tFgRTa7QEt6grZNwg1YvTH8gtew0V1jHEUboX-qdrzJI14U7t-8aWL7W-VaN6FVPg2V0T-FZPirtwXk6z606PcgoLG1U_trjNwgshl2Iff0bX7aTSLzrV5bCASRdRRmvc7OyYFJTbnij5Cx3NWyWgm3SJkgkUCbbNkG3CR18eDD7oApXN1DXPQyZJoN03zVv4Icyi4",
-	},
-	{
-		id: "side-2",
-		title: "Ngòi Bút Mạ Vàng",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuDs1RziyboFAmX82z2XgqdamFXOj9_oFlxpnleqxkqAKpHTLMV1opuH1Nv1P5paTZB4JN3gxv3-zKITlE5Itta7FF2aDp47IM86O77F0jeSxNCPFq_MtB6sgBdZaC3105toIUlHJFrIvdpXcEZEkVjZ-LvsDjCU8GMkeDv95z9pwFwR9lVbl_zd8tVbzdJo5UVJdilf4bm6_5w9BdQqhMoa9VVzr_m9s8XU6tt-jmWwDZ-TKl0Amalyp3sn-rxDSAFcg9ataqylzpw",
-	},
-];
-
-const newReleases = [
-	{
-		id: "nr-1",
-		author: "Lê Minh",
-		title: "Bóng Tối Của Quá Khứ",
-		rating: "4.9",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuDLuzYxg9x0WgKBtE11SlG06awQ5c64JxKNCVQNZw9UdS6wzd446WKp1vQftNuRmnGqRKNEseEu_RUqM3f5Q_wHhGZVPCbwSPZPz92PH9qPM0pkwCP5O2xH3qfUlqa8xqwD157djsLUuDotZWE7Jk9T3uZwuzthK6T_2kslIBdCj-luKzzKUPZttkPslv2UduQqkYuJqeFPZIVUXsMnNFGItZ66wpqJwLqN1tMyXKTwMUOIn8yUp_k9bs9f5Z4XT7gea0L1yzdMYRQ",
-	},
-	{
-		id: "nr-2",
-		author: "Ngọc Lan",
-		title: "Thư Viện Nửa Đêm",
-		rating: "4.8",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuDXb21VKFl33tGL326NZGLOsmaS1o5dRdcFr0GeTN7rhjTmKpF7cKGkq_cVHZOgDtIZRwwUYCsX4oqABnTzm7460xddGJ9Tns7okR6OBWm4uADDpOawKch9dU_JiIFTjl6YeM1ITsQT3R_lwGUNs5EKOaO3A2Lt02_OdXWcSbx_LXinbKCgjlN1jc3d6AliTBhsnRTaSD-DbpzK--ERC4PG7XHZe7TUDk0a36qaWo6IMWQbSYlT2_HJXhAm3petW429ZV72CoWwzuk",
-	},
-	{
-		id: "nr-3",
-		author: "Hải Anh",
-		title: "Vượt Qua Chân Trời",
-		rating: "4.7",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuA4KtWM2DR4gRdVyjKaYOKGd6i6-1druhaIAXMECoJgrBidAa9adKy52Dzfyroey-WUj1PcjFJLJDLx1pkefT3yRRSWuU6PXv84Fc3V5HQRq4d8Bw43k7mLPGGxrhNyoBk9UsmPEoPv9pcX-_pJXrHI8hiGCtPmS85NTMvXsZRIzybY59URuUhe6qcEx2eYOnVc5dr-fAsFOXY8sN6DZemf_H8lgR_0kVC77fcpdkFZSGd3WffyM3tq82hmotFPJkWgV_z_Va0-J2I",
-	},
-	{
-		id: "nr-4",
-		author: "Trần Khoa",
-		title: "Người Vẽ Bản Đồ Thất Lạc",
-		rating: "5.0",
-		image:
-			"https://lh3.googleusercontent.com/aida-public/AB6AXuC0bALptL0sMHAhLxW8aLwUrmSOKpIGBTwI3Jt0lU5ReZnoV2FWvury65GCYlHsTVOtlpvYE3aYWA574TCCcfcD4c6n6thIgDT9obkxWuZDD-Fba-LsZa4Wvs35tHwBMtW5gO17056w-xidtkQJoDmeJ80fCWbo6rdOtu8BtvfV-T60nv6mkU0Xz6Q99OXF7Qxo1I9M89KXG28mshCnYZ7fVFu7yFUCxZWyRpnSWxliepNEH98XcNBAoISzYTaF82HIHRmjlVu94Lw",
-	},
-];
+const DEFAULT_STORY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
 const categories = [
 	{ id: "cat-1", label: "Lãng Mạn", icon: "auto-stories" },
@@ -76,6 +24,55 @@ const categories = [
 ];
 
 const HomeScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
+	const { stories, loading } = useSelector((state) => state.story);
+
+	useEffect(() => {
+		dispatch(fetchStories());
+	}, [dispatch]);
+
+	const featuredStories = stories.slice(0, 3);
+	const newReleases = stories.slice(3);
+
+	const handleReadNow = async (storyId) => {
+		if (!storyId) {
+			Alert.alert("Lỗi", "Không tìm thấy truyện để đọc.");
+			return;
+		}
+
+		try {
+			const [, chapters] = await Promise.all([
+				dispatch(fetchStoryDetails(storyId)).unwrap(),
+				dispatch(fetchChapters(storyId)).unwrap(),
+			]);
+
+			const chapterList = Array.isArray(chapters) ? [...chapters] : [];
+			const firstChapter = chapterList
+				.sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0))
+				[0];
+
+			if (!firstChapter) {
+				Alert.alert("Thông báo", "Truyện chưa có chương nào.");
+				return;
+			}
+
+			navigation.navigate("ChapterRead", {
+				chapterId: firstChapter.id,
+				storyId,
+			});
+		} catch (error) {
+			Alert.alert("Lỗi", "Không thể mở chương đầu tiên.");
+		}
+	};
+
+	if (loading && stories.length === 0) {
+		return (
+			<SafeAreaView style={[styles.safeArea, { justifyContent: "center", alignItems: "center" }]}>
+				<ActivityIndicator size="large" color="#dca77c" />
+			</SafeAreaView>
+		);
+	}
+
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<View style={styles.root}>
@@ -100,50 +97,56 @@ const HomeScreen = ({ navigation }) => {
 						<Text style={styles.sectionAction}>Xem tất cả</Text>
 					</View>
 
-					<View style={styles.featuredGrid}>
-						<TouchableOpacity
-							style={styles.featuredMain}
-							activeOpacity={0.9}
-							onPress={() => navigation.navigate("StoryDetail")}
-						>
-							<Image
-								source={{ uri: featuredStories[0].image }}
-								style={styles.featuredMainImage}
-							/>
-							<View style={styles.featuredMainOverlay} />
-							<View style={styles.featuredMainContent}>
-								<Text style={styles.featuredBadge}>LỰA CHỌN BIÊN TẬP</Text>
-								<Text style={styles.featuredTitle}>{featuredStories[0].title}</Text>
-								<Text style={styles.featuredSubtitle}>
-									{featuredStories[0].subtitle}
-								</Text>
-								<TouchableOpacity
-									style={styles.readNowButton}
-									onPress={() => navigation.navigate("ChapterRead")}
-								>
-									<Text style={styles.readNowText}>Đọc ngay</Text>
-								</TouchableOpacity>
-							</View>
-						</TouchableOpacity>
+					{featuredStories.length > 0 ? (
+						<View style={styles.featuredGrid}>
+							<TouchableOpacity
+								style={styles.featuredMain}
+								activeOpacity={0.9}
+								onPress={() => navigation.navigate("StoryDetail", { storyId: featuredStories[0]?.id })}
+							>
+								<Image
+									source={{ uri: featuredStories[0]?.cover_image || featuredStories[0]?.image || DEFAULT_STORY_IMAGE }}
+									style={styles.featuredMainImage}
+								/>
+								<View style={styles.featuredMainOverlay} />
+								<View style={styles.featuredMainContent}>
+									<Text style={styles.featuredBadge}>LỰA CHỌN BIÊN TẬP</Text>
+									<Text style={styles.featuredTitle}>{featuredStories[0]?.title || "Đang cập nhật"}</Text>
+									<Text style={styles.featuredSubtitle} numberOfLines={2}>
+										{featuredStories[0]?.description || "Không có đoạn trích dẫn cụ thể nào cho tác phẩm này."}
+									</Text>
+									<TouchableOpacity
+										style={styles.readNowButton}
+										onPress={() => handleReadNow(featuredStories[0]?.id)}
+									>
+										<Text style={styles.readNowText}>Đọc ngay</Text>
+									</TouchableOpacity>
+								</View>
+							</TouchableOpacity>
 
-						<View style={styles.featuredSideColumn}>
-							{featuredStories.slice(1).map((story) => (
-								<TouchableOpacity
-									key={story.id}
-									style={styles.featuredSideCard}
-									activeOpacity={0.9}
-									onPress={() => navigation.navigate("StoryDetail")}
-								>
-									<Image
-										source={{ uri: story.image }}
-										style={styles.featuredSideImage}
-									/>
-									<View style={styles.featuredSideOverlay} />
-									<Text style={styles.featuredSideTitle}>{story.title}</Text>
-								</TouchableOpacity>
-							))}
+							<View style={styles.featuredSideColumn}>
+								{featuredStories.slice(1).map((story) => (
+									<TouchableOpacity
+										key={story.id}
+										style={styles.featuredSideCard}
+										activeOpacity={0.9}
+										onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })}
+									>
+										<Image
+											source={{ uri: story?.cover_image || story?.image || DEFAULT_STORY_IMAGE }}
+											style={styles.featuredSideImage}
+										/>
+										<View style={styles.featuredSideOverlay} />
+										<Text style={styles.featuredSideTitle} numberOfLines={2}>{story.title}</Text>
+									</TouchableOpacity>
+								))}
+							</View>
 						</View>
-					</View>
+					) : (
+						<Text style={{ textAlign: "center", color: "#8c4f3b", marginVertical: 20 }}>
+							Chưa có truyện nào
+						</Text>
+					)}
 
 					<View style={styles.sectionHeaderRow}>
 						<Text style={styles.sectionTitle}>Mới Phát Hành</Text>
@@ -162,28 +165,36 @@ const HomeScreen = ({ navigation }) => {
 						showsHorizontalScrollIndicator={false}
 						contentContainerStyle={styles.releaseRow}
 					>
-						{newReleases.map((release) => (
-							<View key={release.id} style={styles.releaseCard}>
-								<TouchableOpacity
-									style={styles.releaseCoverWrap}
-									activeOpacity={0.9}
-									onPress={() => navigation.navigate("StoryDetail")}
-								>
-									<Image
-										source={{ uri: release.image }}
-										style={styles.releaseCover}
-									/>
-								</TouchableOpacity>
-								<Text style={styles.releaseAuthor}>{release.author}</Text>
-								<Text style={styles.releaseTitle}>{release.title}</Text>
-								<View style={styles.releaseRating}>
-									<MaterialIcons name="star" size={14} color="#8c4f3b" />
-									<Text style={styles.releaseRatingText}>
-										{release.rating}
+						{newReleases.length > 0 ? (
+							newReleases.map((release) => (
+								<View key={release.id} style={styles.releaseCard}>
+									<TouchableOpacity
+										style={styles.releaseCoverWrap}
+										activeOpacity={0.9}
+										onPress={() => navigation.navigate("StoryDetail", { storyId: release.id })}
+									>
+										<Image
+											source={{ uri: release?.cover_image || release?.image || DEFAULT_STORY_IMAGE }}
+											style={styles.releaseCover}
+										/>
+									</TouchableOpacity>
+									<Text style={styles.releaseAuthor}>
+										{release?.author_name || release?.author || "Đang cập nhật"}
 									</Text>
+									<Text style={styles.releaseTitle}>{release.title}</Text>
+									<View style={styles.releaseRating}>
+										<MaterialIcons name="star" size={14} color="#8c4f3b" />
+										<Text style={styles.releaseRatingText}>
+											{release?.rating || "5.0"}
+										</Text>
+									</View>
 								</View>
-							</View>
-						))}
+							))
+						) : (
+							<Text style={{ textAlign: "center", color: "#8c4f3b", marginVertical: 20 }}>
+								Chưa có truyện nào
+							</Text>
+						)}
 					</ScrollView>
 
 					<Text style={styles.sectionTitle}>Thể Loại Phổ Biến</Text>

@@ -50,9 +50,11 @@ const RegisterScreen = ({ navigation }) => {
 		}))
 		.unwrap()
 		.then(() => {
-			Alert.alert("Thành công", "Đăng ký thành công! Hãy đăng nhập.", [
-				{ text: "OK", onPress: () => navigation.navigate("Login") }
-			]);
+			Alert.alert("Thành công", "Đăng ký thành công! Hãy đăng nhập.");
+			navigation.reset({
+				index: 0,
+				routes: [{ name: "Login" }],
+			});
 		})
 		.catch((errorMsg) => {
 			Alert.alert("Lỗi", errorMsg);

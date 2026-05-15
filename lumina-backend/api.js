@@ -11,7 +11,7 @@ var con = mysql.createConnection({
     host: "localhost",
     port: "3306",
     user: "root",
-    password: "admin123", 
+    password: "123456789",
     database: "AppDocTruyen"
 });
 
@@ -50,6 +50,25 @@ app.post('/api/login', (req, res) => {
     });
 });
 
+// 2.1. Lấy thông tin người dùng theo ID
+app.get('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = `
+        SELECT id, username, email, full_name, avatar, balance, is_vip, role_id, status, created_at
+        FROM users
+        WHERE id = ?
+    `;
+
+    con.query(sql, [id], (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (results.length > 0) {
+            res.json({ status: "success", user: results[0] });
+        } else {
+            res.status(404).json({ status: "error", message: "Không tìm thấy người dùng" });
+        }
+    });
+});
+
 // 3. Lấy danh sách thể loại truyện
 app.get('/api/categories', (req, res) => {
     const sql = "SELECT * FROM categories";
@@ -62,7 +81,7 @@ app.get('/api/categories', (req, res) => {
 // 4. Lấy danh sách tất cả truyện (đã được duyệt)
 app.get('/api/stories', (req, res) => {
     const sql = `
-        SELECT s.*, u.full_name as author_name, c.name as category_name 
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name 
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
         LEFT JOIN categories c ON s.category_id = c.id
@@ -78,7 +97,7 @@ app.get('/api/stories', (req, res) => {
 app.get('/api/stories/:id', (req, res) => {
     const { id } = req.params;
     const sql = `
-        SELECT s.*, u.full_name as author_name, c.name as category_name 
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name 
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
         LEFT JOIN categories c ON s.category_id = c.id

@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+const API_URL = 'http://192.168.1.8:5555/api';
 
 // 1. Thunk: Gọi API Đăng nhập
 export const loginUser = createAsyncThunk("auth/loginUser",
@@ -36,6 +36,19 @@ export const registerUser = createAsyncThunk("auth/registerUser",
 			
 			if (data.status === "success") return data.message;
 			return rejectWithValue(data.message || "Đăng ký thất bại.");
+		} catch (error) {
+			return rejectWithValue("Không thể kết nối đến server.");
+		}
+	}
+);
+
+// 3. Thunk: Lấy thông tin người dùng theo ID
+export const fetchUserProfile = createAsyncThunk("auth/fetchUserProfile",
+	async (userId, { rejectWithValue }) => {
+		try {
+			const data = await fetch(`${API_URL}/users/${userId}`).then(res => res.json());
+			if (data.status === "success") return data.user;
+			return rejectWithValue(data.message || "Không lấy được thông tin người dùng.");
 		} catch (error) {
 			return rejectWithValue("Không thể kết nối đến server.");
 		}
@@ -82,6 +95,20 @@ const authSlice = createSlice({
 				state.loading = false;
 			})
 			.addCase(registerUser.rejected, (state, action) => {
+				state.loading = false;
+				state.error = action.payload;
+			})
+
+			// Xử lý lấy thông tin người dùng
+			.addCase(fetchUserProfile.pending, (state) => {
+				state.loading = true;
+				state.error = null;
+			})
+			.addCase(fetchUserProfile.fulfilled, (state, action) => {
+				state.loading = false;
+				state.user = action.payload;
+			})
+			.addCase(fetchUserProfile.rejected, (state, action) => {
 				state.loading = false;
 				state.error = action.payload;
 			});
