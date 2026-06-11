@@ -62,125 +62,121 @@ const AdminDashboardScreen = ({ navigation }) => {
 			.then(res => setTopupRequests(res.data || [])).catch(() => {});
 	}, []);
 
-	const handleApprove = (storyId) => {
-		Alert.alert("Duyệt truyện", "Xác nhận duyệt truyện này?", [
+	const apiCall = async (url, options = {}) => {
+		const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
+		const json = await res.json();
+		if (json.status !== 'success') throw new Error(json.message || 'Lỗi không xác định');
+		return json;
+	};
+
+	const confirm = (title, msg, onOk, destructive = false) => {
+		Alert.alert(title, msg, [
 			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Duyệt", onPress: async () => {
-					await fetch(`${API_URL}/admin/stories/${storyId}/status`, {
-						method: 'PUT', headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ status: 'published' }),
-					});
-					loadData();
-				}
-			}
+			{ text: "Xác nhận", style: destructive ? "destructive" : "default", onPress: onOk },
 		]);
 	};
+
+	const handleApprove = (storyId) => confirm(
+		"Duyệt truyện", "Xác nhận duyệt và phát hành truyện này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/stories/${storyId}/status`, { method: 'PUT', body: JSON.stringify({ status: 'published' }) });
+				Alert.alert("Thành công", "Đã duyệt truyện.");
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
 
 	const handleRejectSubmit = async () => {
 		if (!rejectReason.trim()) { Alert.alert("Lỗi", "Vui lòng nhập lý do từ chối."); return; }
 		setRejecting(true);
 		try {
-			await fetch(`${API_URL}/admin/stories/${rejectTarget}/status`, {
-				method: 'PUT', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ status: 'rejected', rejection_reason: rejectReason.trim() }),
+			await apiCall(`${API_URL}/admin/stories/${rejectTarget}/status`, {
+				method: 'PUT', body: JSON.stringify({ status: 'rejected', rejection_reason: rejectReason.trim() }),
 			});
-			setRejectTarget(null); setRejectReason(''); loadData();
-		} finally { setRejecting(false); }
+			setRejectTarget(null); setRejectReason('');
+			loadData();
+		} catch (e) { Alert.alert("Lỗi", e.message); }
+		finally { setRejecting(false); }
 	};
 
 	const handleUserAction = (userId, currentStatus) => {
 		const newStatus = currentStatus === 'active' ? 'banned' : 'active';
-		const label = newStatus === 'banned' ? 'Ban' : 'Unban';
-		Alert.alert(`${label} người dùng`, `Bạn muốn ${label} người dùng này?`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: label, style: newStatus === 'banned' ? 'destructive' : 'default',
-				onPress: async () => {
-					await fetch(`${API_URL}/admin/users/${userId}/status`, {
-						method: 'PUT', headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ status: newStatus }),
-					});
+		confirm(
+			newStatus === 'banned' ? "Ban người dùng" : "Unban người dùng",
+			`Bạn muốn ${newStatus === 'banned' ? 'ban' : 'unban'} người dùng này?`,
+			async () => {
+				try {
+					await apiCall(`${API_URL}/admin/users/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
 					loadData();
-				}
-			}
-		]);
+				} catch (e) { Alert.alert("Lỗi", e.message); }
+			},
+			newStatus === 'banned'
+		);
 	};
 
-	const handleGrantVip = (userId, username) => {
-		Alert.alert("Cấp VIP", `Cấp VIP vĩnh viễn cho @${username}?`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Cấp VIP", onPress: async () => {
-					await fetch(`${API_URL}/admin/users/${userId}/vip`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleGrantVip = (userId, username) => confirm(
+		"Cấp VIP", `Cấp VIP vĩnh viễn cho @${username}?`,
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/users/${userId}/vip`, { method: 'PUT' });
+				Alert.alert("Thành công", `Đã cấp VIP cho @${username}.`);
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
 
-	const handleRevokeVip = (userId, username) => {
-		Alert.alert("Thu hồi VIP", `Thu hồi VIP của @${username}?`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Thu hồi", style: "destructive",
-				onPress: async () => {
-					await fetch(`${API_URL}/admin/users/${userId}/revoke-vip`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleRevokeVip = (userId, username) => confirm(
+		"Thu hồi VIP", `Thu hồi VIP của @${username}?`,
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/users/${userId}/revoke-vip`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}, true
+	);
 
-	const handleApproveAuthor = (userId, name) => {
-		Alert.alert("Duyệt tác giả", `Cấp quyền Author cho ${name}?`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Duyệt", onPress: async () => {
-					await fetch(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleApproveAuthor = (userId, name) => confirm(
+		"Duyệt tác giả", `Cấp quyền Author cho ${name}?`,
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
+				Alert.alert("Thành công", `Đã cấp quyền Author cho ${name}.`);
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
 
-	const handleApproveTopup = (id) => {
-		Alert.alert("Xác nhận nạp xu", "Bạn đã nhận được tiền chuyển khoản và muốn duyệt yêu cầu này?", [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Duyệt", onPress: async () => {
-					await fetch(`${API_URL}/admin/topup/${id}/approve`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleRejectAuthor = (userId) => confirm(
+		"Từ chối", "Từ chối yêu cầu tác giả này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/users/${userId}/reject-author`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}, true
+	);
 
-	const handleRejectTopup = (id) => {
-		Alert.alert("Từ chối nạp xu", "Từ chối yêu cầu nạp xu này?", [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Từ chối", style: "destructive",
-				onPress: async () => {
-					await fetch(`${API_URL}/admin/topup/${id}/reject`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleApproveTopup = (id) => confirm(
+		"Xác nhận nạp xu", "Bạn đã nhận được tiền và muốn cộng xu cho người dùng này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/topup/${id}/approve`, { method: 'PUT' });
+				Alert.alert("Thành công", "Đã duyệt và cộng xu.");
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
 
-	const handleRejectAuthor = (userId) => {
-		Alert.alert("Từ chối", "Từ chối yêu cầu tác giả này?", [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Từ chối", style: "destructive",
-				onPress: async () => {
-					await fetch(`${API_URL}/admin/users/${userId}/reject-author`, { method: 'PUT' });
-					loadData();
-				}
-			}
-		]);
-	};
+	const handleRejectTopup = (id) => confirm(
+		"Từ chối nạp xu", "Từ chối yêu cầu nạp xu này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/topup/${id}/reject`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}, true
+	);
 
 	const displayedStories = storyFilter === 'pending' ? pendingStories : filteredStories;
 
