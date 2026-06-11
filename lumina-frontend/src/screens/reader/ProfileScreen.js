@@ -311,7 +311,7 @@ const ProfileScreen = ({ navigation }) => {
 									<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
 								</TouchableOpacity>
 							</>
-						) : (
+						) : topupStep === 2 ? (
 							<>
 								<View style={styles.bankCard}>
 									{[
