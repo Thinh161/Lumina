@@ -10,11 +10,13 @@ import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
 import LoginScreen from "../screens/guest/LoginScreen";
 import RegisterScreen from "../screens/guest/RegisterScreen";
 import ChapterReadScreen from "../screens/guest/ChapterReadScreen";
+import SearchScreen from "../screens/guest/SearchScreen";
 import UserNavigation from "./UserNavigation";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
+const SearchStack = createNativeStackNavigator();
 
 // ==========================================
 // VIEW COMPONENTS
@@ -36,6 +38,15 @@ const GuestHomeStack = () => {
 			<HomeStack.Screen name="HomeMain" component={HomeGuestScreen} />
 			<HomeStack.Screen name="StoryDetail" component={StoryDetailScreen} />
 		</HomeStack.Navigator>
+	);
+};
+
+const GuestSearchStack = () => {
+	return (
+		<SearchStack.Navigator screenOptions={{ headerShown: false }}>
+			<SearchStack.Screen name="SearchMain" component={SearchScreen} />
+			<SearchStack.Screen name="StoryDetail" component={StoryDetailScreen} />
+		</SearchStack.Navigator>
 	);
 };
 
@@ -76,7 +87,7 @@ const GuestTabs = () => {
 			/>
 			<Tab.Screen
 				name="SearchTab"
-				children={() => <PlaceholderScreen label="Tìm kiếm" />}
+				component={GuestSearchStack}
 				options={{
 					tabBarLabel: "Tìm kiếm",
 					tabBarIcon: ({ color, size }) => (
