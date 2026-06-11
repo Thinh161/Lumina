@@ -694,14 +694,17 @@ app.post('/api/topup/request', (req, res) => {
 });
 
 app.get('/api/admin/topup', (req, res) => {
+    const status = req.query.status || 'pending';
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    const s = validStatuses.includes(status) ? status : 'pending';
     const sql = `
-        SELECT t.*, u.username, u.full_name
+        SELECT t.*, u.username, u.full_name, u.avatar
         FROM topup_requests t
         JOIN users u ON t.user_id = u.id
-        WHERE t.status = 'pending'
-        ORDER BY t.created_at ASC
+        WHERE t.status = ?
+        ORDER BY t.created_at DESC
     `;
-    con.query(sql, (err, results) => {
+    con.query(sql, [s], (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", data: results });
     });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput, ScrollView
+	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput, RefreshControl
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -19,7 +19,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 	const [users, setUsers] = useState([]);
 	const [authorRequests, setAuthorRequests] = useState([]);
 	const [topupRequests, setTopupRequests] = useState([]);
+	const [topupFilter, setTopupFilter] = useState('pending');
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 	const [rejectTarget, setRejectTarget] = useState(null);
 	const [rejectReason, setRejectReason] = useState('');
 	const [rejecting, setRejecting] = useState(false);
@@ -39,16 +41,18 @@ const AdminDashboardScreen = ({ navigation }) => {
 				const res = await fetch(`${API_URL}/admin/author-requests`).then(r => r.json());
 				setAuthorRequests(res.data || []);
 			} else if (tab === 'topup') {
-				const res = await fetch(`${API_URL}/admin/topup`).then(r => r.json());
+				const res = await fetch(`${API_URL}/admin/topup?status=${topupFilter}`).then(r => r.json());
 				setTopupRequests(res.data || []);
 			} else {
 				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
-				setUsers(res.data || []);
+				setUsers((res.data || []).filter(u => u.role_id !== 1));
 			}
-		} finally { setLoading(false); }
-	}, [tab, storyFilter]);
+		} finally { setLoading(false); setRefreshing(false); }
+	}, [tab, storyFilter, topupFilter]);
 
 	useEffect(() => { loadData(); }, [loadData]);
+
+	const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 
 	// Load counts for badges on every mount
 	useEffect(() => {
@@ -280,6 +284,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 						<Text style={{ fontSize: 12, color: '#888888' }}>{Number(item.amount_vnd).toLocaleString('vi-VN')}đ</Text>
 					</View>
 				</View>
+				{item.status === 'pending' ? (
 				<View style={s.actions}>
 					<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveTopup(item.id)}>
 						<MaterialIcons name="check" size={16} color="#FFFFFF" />
@@ -290,6 +295,11 @@ const AdminDashboardScreen = ({ navigation }) => {
 						<Text style={s.rejectBtnText}>Từ chối</Text>
 					</TouchableOpacity>
 				</View>
+			) : (
+				<View style={[s.statusDot, { alignSelf: 'flex-start', backgroundColor: item.status === 'approved' ? '#2E7D32' : '#D32F2F', paddingHorizontal: 10, paddingVertical: 4 }]}>
+					<Text style={s.statusDotText}>{item.status === 'approved' ? '✓ Đã duyệt' : '✗ Từ chối'}</Text>
+				</View>
+			)}
 			</View>
 		);
 	};
@@ -336,6 +346,19 @@ const AdminDashboardScreen = ({ navigation }) => {
 					))}
 				</View>
 			)}
+			{tab === 'topup' && (
+				<View style={s.filterRow}>
+					{[
+						{ key: 'pending', label: 'Chờ duyệt' },
+						{ key: 'approved', label: 'Đã duyệt' },
+						{ key: 'rejected', label: 'Từ chối' },
+					].map(f => (
+						<TouchableOpacity key={f.key} style={[s.filterBtn, topupFilter === f.key && s.filterBtnActive]} onPress={() => setTopupFilter(f.key)}>
+							<Text style={[s.filterText, topupFilter === f.key && s.filterTextActive]}>{f.label}</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			)}
 
 			{loading ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
@@ -345,23 +368,23 @@ const AdminDashboardScreen = ({ navigation }) => {
 					<Text style={s.emptyText}>Không có truyện nào.</Text>
 				</View>
 			) : tab === 'stories' ? (
-				<FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+				<FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'authors' && authorRequests.length === 0 ? (
 				<View style={s.center}>
 					<MaterialIcons name="person-add-disabled" size={52} color="#EBEBEB" />
 					<Text style={s.emptyText}>Không có yêu cầu tác giả nào.</Text>
 				</View>
 			) : tab === 'authors' ? (
-				<FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+				<FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'topup' && topupRequests.length === 0 ? (
 				<View style={s.center}>
 					<MaterialIcons name="account-balance-wallet" size={52} color="#EBEBEB" />
 					<Text style={s.emptyText}>Không có yêu cầu nạp xu nào.</Text>
 				</View>
 			) : tab === 'topup' ? (
-				<FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+				<FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : (
-				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			)}
 
 			<Modal visible={!!rejectTarget} animationType="slide" transparent>

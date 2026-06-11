@@ -132,6 +132,7 @@ const Navigation = () => {
 				<Stack.Screen name="Register" component={RegisterScreen} />
 				<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 				<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
+				<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
 				<Stack.Screen name="Reader" component={UserNavigation} />
 				<Stack.Screen name="Admin" component={AdminDashboardScreen} />
 			</Stack.Navigator>
