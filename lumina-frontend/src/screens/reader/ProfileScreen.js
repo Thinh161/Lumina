@@ -31,10 +31,13 @@ const ProfileScreen = ({ navigation }) => {
 	const [topupAmount, setTopupAmount] = useState('');
 	const [topupLoading, setTopupLoading] = useState(false);
 
+	const isReader = user?.role_id === 4;
+
 	const managementItems = [
 		{ id: "m-1", title: "Thông tin cá nhân", subtitle: "Cập nhật tên và ảnh đại diện", icon: "person", screen: "EditProfile" },
 		{ id: "m-2", title: "Bảo mật & Mật khẩu", subtitle: "Đổi mật khẩu tài khoản", icon: "security", screen: "ChangePassword" },
 		{ id: "m-history", title: "Lịch sử đọc", subtitle: "Xem lại những chương đã đọc", icon: "history", screen: "ReadingHistory" },
+		...(isReader ? [{ id: "m-become-author", title: "Trở thành tác giả", subtitle: "Gửi yêu cầu lên Admin", icon: "create", action: "requestAuthor" }] : []),
 		...(isAuthor ? [{ id: "m-author", title: "Quản lý truyện", subtitle: "Đăng truyện mới, thêm chương", icon: "edit-note", screen: "AuthorDashboard" }] : []),
 		...(isAdmin ? [{ id: "m-admin", title: "Admin Dashboard", subtitle: "Kiểm duyệt truyện, quản lý user", icon: "admin-panel-settings", screen: "AdminDashboard" }] : []),
 	];
@@ -79,6 +82,40 @@ const ProfileScreen = ({ navigation }) => {
 			}
 		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
 		finally { setTopupLoading(false); }
+	};
+
+	const handleBuyVip = () => {
+		if (user?.is_vip) { Alert.alert("VIP", "Bạn đã là thành viên VIP rồi."); return; }
+		Alert.alert("Mua VIP", `Bạn sẽ tiêu 1000 xu để kích hoạt VIP vĩnh viễn.\nSố dư hiện tại: ${Number(user?.balance || 0).toLocaleString("vi-VN")} xu`, [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Mua ngay", onPress: async () => {
+					try {
+						const res = await fetch(`${API_URL}/users/${user.id}/buy-vip`, { method: 'PUT' }).then(r => r.json());
+						if (res.status === 'success') {
+							dispatch(fetchUserProfile(user.id));
+							Alert.alert("Thành công", res.message);
+						} else {
+							Alert.alert("Lỗi", res.message);
+						}
+					} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+				}
+			}
+		]);
+	};
+
+	const handleRequestAuthor = () => {
+		Alert.alert("Trở thành tác giả", "Gửi yêu cầu lên Admin để được cấp quyền đăng truyện?", [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Gửi yêu cầu", onPress: async () => {
+					try {
+						const res = await fetch(`${API_URL}/users/${user.id}/request-author`, { method: 'PUT' }).then(r => r.json());
+						Alert.alert(res.status === 'success' ? "Đã gửi" : "Thông báo", res.message);
+					} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+				}
+			}
+		]);
 	};
 
 	const displayName = user?.full_name || user?.username || "Độc giả";
@@ -135,10 +172,18 @@ const ProfileScreen = ({ navigation }) => {
 								</View>
 								<Text style={styles.vipSubtitle}>Xu hiện có trong tài khoản của bạn</Text>
 							</View>
-							<TouchableOpacity style={styles.vipButton} onPress={() => setShowTopup(true)}>
-								<Text style={styles.vipButtonText}>Nạp Xu Ngay</Text>
-								<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
-							</TouchableOpacity>
+							<View style={{ flexDirection: "row", gap: 8 }}>
+								<TouchableOpacity style={[styles.vipButton, { flex: 1 }]} onPress={() => setShowTopup(true)}>
+									<Text style={styles.vipButtonText}>Nạp Xu</Text>
+									<MaterialIcons name="add" size={16} color="#FFFFFF" />
+								</TouchableOpacity>
+								{!user?.is_vip && (
+									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#5D2E0C" }]} onPress={handleBuyVip}>
+										<Text style={styles.vipButtonText}>Mua VIP</Text>
+										<MaterialIcons name="star" size={16} color="#FFD700" />
+									</TouchableOpacity>
+								)}
+							</View>
 							<View style={styles.vipGlow} />
 						</View>
 
@@ -178,7 +223,10 @@ const ProfileScreen = ({ navigation }) => {
 									<TouchableOpacity
 										key={item.id}
 										style={styles.managementRow}
-										onPress={() => item.screen && navigation.navigate(item.screen)}
+										onPress={() => {
+											if (item.action === 'requestAuthor') { handleRequestAuthor(); return; }
+											if (item.screen) navigation.navigate(item.screen);
+										}}
 									>
 										<View style={styles.managementLeft}>
 											<View style={styles.managementIconWrap}>

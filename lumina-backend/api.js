@@ -24,11 +24,9 @@ con.connect(function (err) {
 
 // 1. Đăng ký tài khoản (Register)
 app.post('/api/register', (req, res) => {
-    const { username, password, email, full_name } = req.body;
-    // Mặc định role_id = 4 (Regular Reader)
-    const sql = `INSERT INTO users (username, password, email, full_name, role_id) VALUES (?, ?, ?, ?, 4)`;
-    
-    con.query(sql, [username, password, email, full_name], (err, result) => {
+    const { username, password, email, full_name, want_author } = req.body;
+    const sql = `INSERT INTO users (username, password, email, full_name, role_id, author_request) VALUES (?, ?, ?, ?, 4, ?)`;
+    con.query(sql, [username, password, email, full_name, want_author ? 1 : 0], (err, result) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", message: "Đăng ký thành công" });
     });
@@ -93,6 +91,32 @@ app.get('/api/stories', (req, res) => {
     });
 });
 
+// 4.2. Truyện mới nhất (phải đặt TRƯỚC /api/stories/:id)
+app.get('/api/stories/latest', (req, res) => {
+    const sql = `
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
+        FROM stories s LEFT JOIN users u ON s.author_id = u.id LEFT JOIN categories c ON s.category_id = c.id
+        WHERE s.status = 'published' ORDER BY s.created_at DESC LIMIT 8
+    `;
+    con.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
+// 4.3. Truyện xem nhiều nhất (phải đặt TRƯỚC /api/stories/:id)
+app.get('/api/stories/top', (req, res) => {
+    const sql = `
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
+        FROM stories s LEFT JOIN users u ON s.author_id = u.id LEFT JOIN categories c ON s.category_id = c.id
+        WHERE s.status = 'published' ORDER BY s.views DESC LIMIT 8
+    `;
+    con.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
 // 4.1. Tìm kiếm truyện (phải đặt TRƯỚC /api/stories/:id)
 app.get('/api/stories/search', (req, res) => {
     const { q = '', category_id } = req.query;
@@ -112,6 +136,15 @@ app.get('/api/stories/search', (req, res) => {
     con.query(sql, params, (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", data: results });
+    });
+});
+
+// 4.4. Tăng lượt xem (kể cả guest)
+app.put('/api/stories/:id/view', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE stories SET views = views + 1 WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ status: "error" });
+        res.json({ status: "success" });
     });
 });
 
@@ -327,14 +360,18 @@ app.post('/api/stories', (req, res) => {
     });
 });
 
-// 21. Thêm chương vào truyện
+// 21. Thêm chương vào truyện (chapter_number tự động)
 app.post('/api/stories/:storyId/chapters', (req, res) => {
     const { storyId } = req.params;
-    const { chapter_number, title, content, is_vip } = req.body;
-    const sql = `INSERT INTO chapters (story_id, chapter_number, title, content, is_vip) VALUES (?, ?, ?, ?, ?)`;
-    con.query(sql, [storyId, chapter_number, title, content, is_vip || false], (err, result) => {
+    const { title, content, is_vip } = req.body;
+    con.query(`SELECT COALESCE(MAX(chapter_number), 0) + 1 as next_num FROM chapters WHERE story_id = ?`, [storyId], (err, rows) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
-        res.json({ status: "success", id: result.insertId });
+        const chapter_number = rows[0].next_num;
+        const sql = `INSERT INTO chapters (story_id, chapter_number, title, content, is_vip) VALUES (?, ?, ?, ?, ?)`;
+        con.query(sql, [storyId, chapter_number, title, content, is_vip || false], (err2, result) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            res.json({ status: "success", id: result.insertId, chapter_number });
+        });
     });
 });
 
@@ -399,6 +436,31 @@ app.get('/api/history/:userId', (req, res) => {
     });
 });
 
+// 29. Mua VIP bằng xu (1000 xu, vĩnh viễn)
+app.put('/api/users/:id/buy-vip', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT balance, is_vip FROM users WHERE id = ?`, [id], (err, results) => {
+        if (err || !results[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user" });
+        const u = results[0];
+        if (u.is_vip) return res.json({ status: "error", message: "Bạn đã là VIP rồi" });
+        if (u.balance < 1000) return res.json({ status: "error", message: "Không đủ xu. Cần 1000 xu." });
+        con.query(`UPDATE users SET balance = balance - 1000, is_vip = 1 WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            res.json({ status: "success", message: "Đã kích hoạt VIP thành công!" });
+        });
+    });
+});
+
+// 30. Gửi yêu cầu trở thành tác giả
+app.put('/api/users/:id/request-author', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE users SET author_request = 1 WHERE id = ? AND role_id = 4`, [id], (err, result) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (result.affectedRows === 0) return res.json({ status: "error", message: "Không hợp lệ hoặc đã gửi rồi" });
+        res.json({ status: "success", message: "Đã gửi yêu cầu. Chờ Admin phê duyệt." });
+    });
+});
+
 // 28. Nạp xu
 app.put('/api/users/:id/balance', (req, res) => {
     const { id } = req.params;
@@ -413,6 +475,64 @@ app.put('/api/users/:id/balance', (req, res) => {
 });
 
 // ========== ADMIN ==========
+
+// Admin: Lấy danh sách yêu cầu tác giả
+app.get('/api/admin/author-requests', (req, res) => {
+    const sql = `
+        SELECT u.id, u.username, u.full_name, u.email, u.avatar, u.created_at, r.role_name
+        FROM users u LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.author_request = 1
+        ORDER BY u.created_at ASC
+    `;
+    con.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
+// Admin: Phê duyệt tác giả
+app.put('/api/admin/users/:id/approve-author', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE users SET role_id = 2, author_request = 0 WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success" });
+    });
+});
+
+// Admin: Từ chối yêu cầu tác giả
+app.put('/api/admin/users/:id/reject-author', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE users SET author_request = 0 WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success" });
+    });
+});
+
+// Admin: Cấp VIP cho user
+app.put('/api/admin/users/:id/vip', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE users SET is_vip = 1 WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success" });
+    });
+});
+
+// Admin: Lấy truyện theo status (published / rejected)
+app.get('/api/admin/stories', (req, res) => {
+    const { status = 'published' } = req.query;
+    const sql = `
+        SELECT s.*, u.full_name as author_name, c.name as category_name
+        FROM stories s
+        LEFT JOIN users u ON s.author_id = u.id
+        LEFT JOIN categories c ON s.category_id = c.id
+        WHERE s.status = ?
+        ORDER BY s.updated_at DESC
+    `;
+    con.query(sql, [status], (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
 
 // 23. Lấy truyện chờ duyệt
 app.get('/api/admin/stories/pending', (req, res) => {

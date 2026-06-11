@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, ActivityIndicator, Image
+	SafeAreaView, ActivityIndicator, Image, RefreshControl
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
@@ -13,6 +13,7 @@ const ReadingHistoryScreen = ({ navigation }) => {
 	const { user } = useSelector(state => state.auth);
 	const [history, setHistory] = useState([]);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 
 	const loadHistory = useCallback(async () => {
 		if (!user) return;
@@ -74,6 +75,7 @@ const ReadingHistoryScreen = ({ navigation }) => {
 					renderItem={renderItem}
 					contentContainerStyle={{ padding: 16, gap: 12 }}
 					showsVerticalScrollIndicator={false}
+					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await loadHistory(); setRefreshing(false); }} colors={["#8B4513"]} tintColor="#8B4513" />}
 				/>
 			)}
 		</SafeAreaView>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
 	View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-	ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator
+	ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Switch
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -15,6 +15,7 @@ const RegisterScreen = ({ navigation }) => {
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
+	const [wantAuthor, setWantAuthor] = useState(false);
 
 	const handleRegister = () => {
 		if (!fullName || !email || !username || !password || !confirmPassword) {
@@ -23,7 +24,7 @@ const RegisterScreen = ({ navigation }) => {
 		if (password !== confirmPassword) {
 			Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp."); return;
 		}
-		dispatch(registerUser({ full_name: fullName, email, username, password }))
+		dispatch(registerUser({ full_name: fullName, email, username, password, want_author: wantAuthor }))
 			.unwrap()
 			.then(() => {
 				Alert.alert("Thành công", "Đăng ký thành công! Hãy đăng nhập.");
@@ -70,6 +71,19 @@ const RegisterScreen = ({ navigation }) => {
 							</View>
 						))}
 
+						<View style={s.authorToggle}>
+							<View style={{ flex: 1 }}>
+								<Text style={s.label}>Tôi muốn trở thành tác giả</Text>
+								<Text style={s.authorSub}>Gửi yêu cầu — Admin sẽ phê duyệt sau</Text>
+							</View>
+							<Switch
+								value={wantAuthor}
+								onValueChange={setWantAuthor}
+								trackColor={{ false: "#EBEBEB", true: "rgba(139,69,19,0.4)" }}
+								thumbColor={wantAuthor ? "#8B4513" : "#BBBBBB"}
+							/>
+						</View>
+
 						<TouchableOpacity style={[s.btn, loading && s.btnOff]} onPress={handleRegister} disabled={loading}>
 							{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>Tạo tài khoản</Text>}
 						</TouchableOpacity>
@@ -104,6 +118,8 @@ const s = StyleSheet.create({
 	footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
 	footerText: { fontSize: 14, color: '#888888' },
 	footerLink: { fontSize: 14, color: '#8B4513', fontWeight: '700' },
+	authorToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F0EB', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#E8D5C4', gap: 12 },
+	authorSub: { fontSize: 11, color: '#8B4513', marginTop: 2 },
 });
 
 export default RegisterScreen;

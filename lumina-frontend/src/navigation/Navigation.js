@@ -77,7 +77,16 @@ const GuestTabs = () => {
 			/>
 			<Tab.Screen
 				name="LibraryTab"
-				children={() => <PlaceholderScreen label="Thư viện" />}
+				children={({ navigation }) => (
+					<View style={styles.loginPrompt}>
+						<MaterialIcons name="auto-stories" size={60} color="#EBEBEB" />
+						<Text style={styles.loginPromptTitle}>Thư viện của bạn</Text>
+						<Text style={styles.loginPromptSub}>Đăng nhập để lưu và xem lại những truyện yêu thích.</Text>
+						<TouchableOpacity style={styles.loginPromptBtn} onPress={() => navigation.navigate("LoginTab")}>
+							<Text style={styles.loginPromptBtnText}>Đăng nhập ngay</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 				options={{
 					tabBarLabel: "Thư viện",
 					tabBarIcon: ({ color, size }) => (
@@ -156,6 +165,11 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#888888",
 	},
+	loginPrompt: { flex: 1, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 40 },
+	loginPromptTitle: { fontSize: 20, fontWeight: "800", color: "#1A1A1A" },
+	loginPromptSub: { fontSize: 14, color: "#888888", textAlign: "center", lineHeight: 20 },
+	loginPromptBtn: { marginTop: 8, backgroundColor: "#8B4513", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 999 },
+	loginPromptBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
 
 export default Navigation;

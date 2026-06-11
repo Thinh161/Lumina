@@ -94,6 +94,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 			dispatch(fetchChapters(storyId));
 			loadComments();
 			loadBookmark();
+			fetch(`${API_URL}/stories/${storyId}/view`, { method: 'PUT' }).catch(() => {});
 		}
 		return () => {
 			dispatch(clearCurrentStory());

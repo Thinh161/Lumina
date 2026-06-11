@@ -1,23 +1,45 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
 	View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-	ScrollView, Image, ActivityIndicator, Alert
+	ScrollView, Image, ActivityIndicator, Alert, RefreshControl
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStories, fetchCategories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
 
+const API_URL = 'http://192.168.10.104:5555/api';
 const DEFAULT_IMG = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
 const HomeGuestScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
 	const { stories, categories, loading } = useSelector(s => s.story);
 	const [selectedCat, setSelectedCat] = useState(null);
+	const [refreshing, setRefreshing] = useState(false);
+	const [latest, setLatest] = useState([]);
+	const [top, setTop] = useState([]);
+
+	const loadSections = useCallback(async () => {
+		try {
+			const [l, t] = await Promise.all([
+				fetch(`${API_URL}/stories/latest`).then(r => r.json()),
+				fetch(`${API_URL}/stories/top`).then(r => r.json()),
+			]);
+			setLatest(l.data || []);
+			setTop(t.data || []);
+		} catch {}
+	}, []);
 
 	useEffect(() => {
 		dispatch(fetchStories());
 		dispatch(fetchCategories());
-	}, [dispatch]);
+		loadSections();
+	}, [dispatch, loadSections]);
+
+	const onRefresh = useCallback(async () => {
+		setRefreshing(true);
+		await Promise.all([dispatch(fetchStories()), dispatch(fetchCategories()), loadSections()]);
+		setRefreshing(false);
+	}, [dispatch, loadSections]);
 
 	const handleReadNow = async (storyId) => {
 		try {
@@ -50,7 +72,9 @@ const HomeGuestScreen = ({ navigation }) => {
 				</TouchableOpacity>
 			</View>
 
-			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}
+			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
+		>
 
 				{/* Category chips */}
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
@@ -92,6 +116,36 @@ const HomeGuestScreen = ({ navigation }) => {
 						</View>
 					</TouchableOpacity>
 				)}
+
+			{latest.length > 0 && (
+				<>
+					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
+					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+						{latest.map(story => (
+							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+								<Text style={s.hAuthor} numberOfLines={1}>{story.author_name}</Text>
+							</TouchableOpacity>
+						))}
+					</ScrollView>
+				</>
+			)}
+
+			{top.length > 0 && (
+				<>
+					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
+					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+						{top.map(story => (
+							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+								<View style={s.hViews}><MaterialIcons name="visibility" size={10} color="#8B4513" /><Text style={s.hViewText}>{story.views || 0}</Text></View>
+							</TouchableOpacity>
+						))}
+					</ScrollView>
+				</>
+			)}
 
 				{/* Story list */}
 				<View style={s.sectionHeader}>
@@ -166,6 +220,13 @@ const s = StyleSheet.create({
 	catPillText: { fontSize: 10, color: '#8B4513', fontWeight: '600' },
 	views: { fontSize: 11, color: '#BBBBBB' },
 	cardDesc: { fontSize: 11, color: '#888888', lineHeight: 16, marginTop: 4 },
+	hList: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+	hCard: { width: 110, gap: 4 },
+	hCover: { width: 110, height: 150, borderRadius: 10 },
+	hTitle: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', lineHeight: 16 },
+	hAuthor: { fontSize: 11, color: '#8B4513' },
+	hViews: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+	hViewText: { fontSize: 10, color: '#8B4513', fontWeight: '600' },
 	empty: { alignItems: 'center', paddingVertical: 48, gap: 10 },
 	emptyText: { fontSize: 14, color: '#BBBBBB' },
 });

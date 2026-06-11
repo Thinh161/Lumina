@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, Image,
-	StyleSheet, SafeAreaView, ActivityIndicator, Alert
+	StyleSheet, SafeAreaView, ActivityIndicator, Alert, RefreshControl
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -14,8 +14,17 @@ const LibraryScreen = ({ navigation }) => {
 	const { user } = useSelector(state => state.auth);
 	const { items, loading } = useSelector(state => state.library);
 
+	const [refreshing, setRefreshing] = useState(false);
+
 	useEffect(() => {
 		if (user?.id) dispatch(fetchLibrary(user.id));
+	}, [dispatch, user]);
+
+	const onRefresh = useCallback(async () => {
+		if (!user?.id) return;
+		setRefreshing(true);
+		await dispatch(fetchLibrary(user.id));
+		setRefreshing(false);
 	}, [dispatch, user]);
 
 	const handleRemove = (storyId, title) => {
@@ -91,6 +100,7 @@ const LibraryScreen = ({ navigation }) => {
 					renderItem={renderItem}
 					contentContainerStyle={styles.list}
 					showsVerticalScrollIndicator={false}
+					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
 				/>
 			)}
 		</SafeAreaView>

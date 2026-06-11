@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput
+	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput, ScrollView
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -10,10 +10,12 @@ const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const AdminDashboardScreen = ({ navigation }) => {
 	const [tab, setTab] = useState('pending');
+	const [storyFilter, setStoryFilter] = useState('pending'); // pending | published | rejected
 	const [pendingStories, setPendingStories] = useState([]);
+	const [filteredStories, setFilteredStories] = useState([]);
 	const [users, setUsers] = useState([]);
+	const [authorRequests, setAuthorRequests] = useState([]);
 	const [loading, setLoading] = useState(true);
-	// Modal lý do từ chối
 	const [rejectTarget, setRejectTarget] = useState(null);
 	const [rejectReason, setRejectReason] = useState('');
 	const [rejecting, setRejecting] = useState(false);
@@ -21,15 +23,23 @@ const AdminDashboardScreen = ({ navigation }) => {
 	const loadData = useCallback(async () => {
 		setLoading(true);
 		try {
-			if (tab === 'pending') {
-				const res = await fetch(`${API_URL}/admin/stories/pending`).then(r => r.json());
-				setPendingStories(res.data || []);
+			if (tab === 'stories') {
+				if (storyFilter === 'pending') {
+					const res = await fetch(`${API_URL}/admin/stories/pending`).then(r => r.json());
+					setPendingStories(res.data || []);
+				} else {
+					const res = await fetch(`${API_URL}/admin/stories?status=${storyFilter}`).then(r => r.json());
+					setFilteredStories(res.data || []);
+				}
+			} else if (tab === 'authors') {
+				const res = await fetch(`${API_URL}/admin/author-requests`).then(r => r.json());
+				setAuthorRequests(res.data || []);
 			} else {
 				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
 				setUsers(res.data || []);
 			}
 		} finally { setLoading(false); }
-	}, [tab]);
+	}, [tab, storyFilter]);
 
 	useEffect(() => { loadData(); }, [loadData]);
 
@@ -39,8 +49,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 			{
 				text: "Duyệt", onPress: async () => {
 					await fetch(`${API_URL}/admin/stories/${storyId}/status`, {
-						method: 'PUT',
-						headers: { 'Content-Type': 'application/json' },
+						method: 'PUT', headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({ status: 'published' }),
 					});
 					loadData();
@@ -54,13 +63,10 @@ const AdminDashboardScreen = ({ navigation }) => {
 		setRejecting(true);
 		try {
 			await fetch(`${API_URL}/admin/stories/${rejectTarget}/status`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
+				method: 'PUT', headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ status: 'rejected', rejection_reason: rejectReason.trim() }),
 			});
-			setRejectTarget(null);
-			setRejectReason('');
-			loadData();
+			setRejectTarget(null); setRejectReason(''); loadData();
 		} finally { setRejecting(false); }
 	};
 
@@ -73,8 +79,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 				text: label, style: newStatus === 'banned' ? 'destructive' : 'default',
 				onPress: async () => {
 					await fetch(`${API_URL}/admin/users/${userId}/status`, {
-						method: 'PUT',
-						headers: { 'Content-Type': 'application/json' },
+						method: 'PUT', headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({ status: newStatus }),
 					});
 					loadData();
@@ -82,6 +87,45 @@ const AdminDashboardScreen = ({ navigation }) => {
 			}
 		]);
 	};
+
+	const handleGrantVip = (userId, username) => {
+		Alert.alert("Cấp VIP", `Cấp VIP vĩnh viễn cho @${username}?`, [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Cấp VIP", onPress: async () => {
+					await fetch(`${API_URL}/admin/users/${userId}/vip`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
+	const handleApproveAuthor = (userId, name) => {
+		Alert.alert("Duyệt tác giả", `Cấp quyền Author cho ${name}?`, [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Duyệt", onPress: async () => {
+					await fetch(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
+	const handleRejectAuthor = (userId) => {
+		Alert.alert("Từ chối", "Từ chối yêu cầu tác giả này?", [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Từ chối", style: "destructive",
+				onPress: async () => {
+					await fetch(`${API_URL}/admin/users/${userId}/reject-author`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
+	const displayedStories = storyFilter === 'pending' ? pendingStories : filteredStories;
 
 	const renderStory = ({ item }) => (
 		<View style={s.card}>
@@ -91,22 +135,30 @@ const AdminDashboardScreen = ({ navigation }) => {
 					<Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
 					<Text style={s.cardMeta}>{item.author_name} • {item.category_name}</Text>
 					<Text style={s.cardDesc} numberOfLines={2}>{item.description || "Không có mô tả."}</Text>
+					{item.rejection_reason ? <Text style={s.rejectionNote}>Lý do: {item.rejection_reason}</Text> : null}
 				</View>
 			</View>
-			<View style={s.actions}>
-				<TouchableOpacity style={s.viewBtn} onPress={() => navigation.navigate("StoryDetail", { storyId: item.id })}>
+			{storyFilter === 'pending' ? (
+				<View style={s.actions}>
+					<TouchableOpacity style={s.viewBtn} onPress={() => navigation.navigate("StoryDetail", { storyId: item.id })}>
+						<MaterialIcons name="visibility" size={16} color="#8B4513" />
+						<Text style={s.viewBtnText}>Xem</Text>
+					</TouchableOpacity>
+					<TouchableOpacity style={s.approveBtn} onPress={() => handleApprove(item.id)}>
+						<MaterialIcons name="check" size={16} color="#FFFFFF" />
+						<Text style={s.approveBtnText}>Duyệt</Text>
+					</TouchableOpacity>
+					<TouchableOpacity style={s.rejectBtn} onPress={() => { setRejectTarget(item.id); setRejectReason(''); }}>
+						<MaterialIcons name="close" size={16} color="#FFFFFF" />
+						<Text style={s.rejectBtnText}>Từ chối</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<TouchableOpacity style={[s.viewBtn, { alignSelf: 'flex-start' }]} onPress={() => navigation.navigate("StoryDetail", { storyId: item.id })}>
 					<MaterialIcons name="visibility" size={16} color="#8B4513" />
-					<Text style={s.viewBtnText}>Xem</Text>
+					<Text style={s.viewBtnText}>Xem chi tiết</Text>
 				</TouchableOpacity>
-				<TouchableOpacity style={s.approveBtn} onPress={() => handleApprove(item.id)}>
-					<MaterialIcons name="check" size={16} color="#FFFFFF" />
-					<Text style={s.approveBtnText}>Duyệt</Text>
-				</TouchableOpacity>
-				<TouchableOpacity style={s.rejectBtn} onPress={() => { setRejectTarget(item.id); setRejectReason(''); }}>
-					<MaterialIcons name="close" size={16} color="#FFFFFF" />
-					<Text style={s.rejectBtnText}>Từ chối</Text>
-				</TouchableOpacity>
-			</View>
+			)}
 		</View>
 	);
 
@@ -116,18 +168,50 @@ const AdminDashboardScreen = ({ navigation }) => {
 			<View style={s.userInfo}>
 				<Text style={s.userName}>{item.full_name || item.username}</Text>
 				<Text style={s.userMeta}>@{item.username} • {item.role_name}</Text>
-				<View style={[s.statusDot, { backgroundColor: item.status === 'active' ? '#2e7d32' : '#c62828' }]}>
-					<Text style={s.statusDotText}>{item.status === 'active' ? 'Hoạt động' : 'Bị khóa'}</Text>
+				<View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+					<View style={[s.statusDot, { backgroundColor: item.status === 'active' ? '#2e7d32' : '#c62828' }]}>
+						<Text style={s.statusDotText}>{item.status === 'active' ? 'Active' : 'Banned'}</Text>
+					</View>
+					{item.is_vip ? <View style={[s.statusDot, { backgroundColor: '#8B4513' }]}><Text style={s.statusDotText}>VIP</Text></View> : null}
 				</View>
 			</View>
-			<TouchableOpacity
-				style={[s.banBtn, item.status !== 'active' && s.unbanBtn]}
-				onPress={() => handleUserAction(item.id, item.status)}
-			>
-				<Text style={s.banBtnText}>{item.status === 'active' ? 'Ban' : 'Unban'}</Text>
-			</TouchableOpacity>
+			<View style={{ gap: 6 }}>
+				<TouchableOpacity style={[s.banBtn, item.status !== 'active' && s.unbanBtn]} onPress={() => handleUserAction(item.id, item.status)}>
+					<Text style={s.banBtnText}>{item.status === 'active' ? 'Ban' : 'Unban'}</Text>
+				</TouchableOpacity>
+				{!item.is_vip && (
+					<TouchableOpacity style={[s.banBtn, { backgroundColor: '#8B4513' }]} onPress={() => handleGrantVip(item.id, item.username)}>
+						<Text style={s.banBtnText}>VIP</Text>
+					</TouchableOpacity>
+				)}
+			</View>
 		</View>
 	);
+
+	const renderAuthorRequest = ({ item }) => (
+		<View style={s.userCard}>
+			<Image source={{ uri: item.avatar || DEFAULT_COVER }} style={s.avatar} />
+			<View style={s.userInfo}>
+				<Text style={s.userName}>{item.full_name || item.username}</Text>
+				<Text style={s.userMeta}>@{item.username} • {item.role_name}</Text>
+				<Text style={{ fontSize: 11, color: '#888888', marginTop: 2 }}>{item.email}</Text>
+			</View>
+			<View style={{ gap: 6 }}>
+				<TouchableOpacity style={[s.banBtn, { backgroundColor: '#2E7D32' }]} onPress={() => handleApproveAuthor(item.id, item.full_name || item.username)}>
+					<Text style={s.banBtnText}>Duyệt</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={[s.banBtn, { backgroundColor: '#D32F2F' }]} onPress={() => handleRejectAuthor(item.id)}>
+					<Text style={s.banBtnText}>Từ chối</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+
+	const TABS = [
+		{ key: 'stories', label: 'Truyện' },
+		{ key: 'authors', label: `Tác giả${authorRequests.length > 0 ? ` (${authorRequests.length})` : ''}` },
+		{ key: 'users', label: 'Người dùng' },
+	];
 
 	return (
 		<SafeAreaView style={s.safe}>
@@ -136,30 +220,46 @@ const AdminDashboardScreen = ({ navigation }) => {
 			</View>
 
 			<View style={s.tabRow}>
-				<TouchableOpacity style={[s.tabBtn, tab === 'pending' && s.tabBtnActive]} onPress={() => setTab('pending')}>
-					<Text style={[s.tabText, tab === 'pending' && s.tabTextActive]}>
-						Chờ duyệt {pendingStories.length > 0 ? `(${pendingStories.length})` : ''}
-					</Text>
-				</TouchableOpacity>
-				<TouchableOpacity style={[s.tabBtn, tab === 'users' && s.tabBtnActive]} onPress={() => setTab('users')}>
-					<Text style={[s.tabText, tab === 'users' && s.tabTextActive]}>Người dùng</Text>
-				</TouchableOpacity>
+				{TABS.map(t => (
+					<TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
+						<Text style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</Text>
+					</TouchableOpacity>
+				))}
 			</View>
+
+			{tab === 'stories' && (
+				<View style={s.filterRow}>
+					{['pending', 'published', 'rejected'].map(f => (
+						<TouchableOpacity key={f} style={[s.filterBtn, storyFilter === f && s.filterBtnActive]} onPress={() => setStoryFilter(f)}>
+							<Text style={[s.filterText, storyFilter === f && s.filterTextActive]}>
+								{f === 'pending' ? 'Chờ duyệt' : f === 'published' ? 'Đã duyệt' : 'Từ chối'}
+								{f === 'pending' && pendingStories.length > 0 ? ` (${pendingStories.length})` : ''}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			)}
 
 			{loading ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
-			) : tab === 'pending' && pendingStories.length === 0 ? (
+			) : tab === 'stories' && displayedStories.length === 0 ? (
 				<View style={s.center}>
 					<MaterialIcons name="check-circle" size={52} color="#2E7D32" />
-					<Text style={s.emptyText}>Không có truyện nào chờ duyệt.</Text>
+					<Text style={s.emptyText}>Không có truyện nào.</Text>
 				</View>
-			) : tab === 'pending' ? (
-				<FlatList data={pendingStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+			) : tab === 'stories' ? (
+				<FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+			) : tab === 'authors' && authorRequests.length === 0 ? (
+				<View style={s.center}>
+					<MaterialIcons name="person-add-disabled" size={52} color="#EBEBEB" />
+					<Text style={s.emptyText}>Không có yêu cầu tác giả nào.</Text>
+				</View>
+			) : tab === 'authors' ? (
+				<FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
 			) : (
 				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
 			)}
 
-			{/* Modal lý do từ chối */}
 			<Modal visible={!!rejectTarget} animationType="slide" transparent>
 				<View style={s.overlay}>
 					<View style={s.sheet}>
@@ -170,12 +270,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 						<Text style={{ fontSize: 13, color: "#888888", marginBottom: 12 }}>Nhập lý do để tác giả biết cần chỉnh sửa gì.</Text>
 						<TextInput
 							style={[s.input, { height: 100, textAlignVertical: "top" }]}
-							value={rejectReason}
-							onChangeText={setRejectReason}
-							placeholder="Ví dụ: Nội dung vi phạm quy định, thiếu mô tả..."
-							placeholderTextColor="#BBBBBB"
-							multiline
-							autoFocus
+							value={rejectReason} onChangeText={setRejectReason}
+							placeholder="Ví dụ: Nội dung vi phạm quy định..." placeholderTextColor="#BBBBBB"
+							multiline autoFocus
 						/>
 						<TouchableOpacity style={[s.rejectSubmitBtn, rejecting && { opacity: 0.6 }]} onPress={handleRejectSubmit} disabled={rejecting}>
 							{rejecting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.rejectSubmitText}>Xác nhận từ chối</Text>}
@@ -191,11 +288,16 @@ const s = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: "#FFFFFF" },
 	header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
-	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginVertical: 12 },
-	tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
+	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginVertical: 10 },
+	tabBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
 	tabBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
-	tabText: { fontSize: 13, fontWeight: "700", color: "#888888" },
+	tabText: { fontSize: 12, fontWeight: "700", color: "#888888" },
 	tabTextActive: { color: "#FFFFFF" },
+	filterRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginBottom: 4 },
+	filterBtn: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: 8, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
+	filterBtnActive: { backgroundColor: "#1A1A1A", borderColor: "#1A1A1A" },
+	filterText: { fontSize: 11, fontWeight: "700", color: "#888888" },
+	filterTextActive: { color: "#FFFFFF" },
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
 	emptyText: { fontSize: 14, color: "#888888" },
 	card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "#F0F0F0" },
@@ -205,6 +307,7 @@ const s = StyleSheet.create({
 	cardTitle: { fontSize: 14, fontWeight: "700", color: "#1A1A1A", lineHeight: 20 },
 	cardMeta: { fontSize: 12, color: "#888888", marginTop: 2 },
 	cardDesc: { fontSize: 11, color: "#888888", marginTop: 4, lineHeight: 16 },
+	rejectionNote: { fontSize: 11, color: "#D32F2F", marginTop: 4, fontStyle: "italic" },
 	actions: { flexDirection: "row", gap: 8 },
 	viewBtn: { paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F5F0EB", paddingVertical: 8, borderRadius: 8 },
 	viewBtnText: { color: "#8B4513", fontWeight: "700", fontSize: 13 },
@@ -217,7 +320,7 @@ const s = StyleSheet.create({
 	userInfo: { flex: 1, marginLeft: 12, gap: 2 },
 	userName: { fontSize: 14, fontWeight: "700", color: "#1A1A1A" },
 	userMeta: { fontSize: 11, color: "#888888" },
-	statusDot: { alignSelf: "flex-start", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, marginTop: 2 },
+	statusDot: { alignSelf: "flex-start", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
 	statusDotText: { fontSize: 10, fontWeight: "700", color: "#FFFFFF" },
 	banBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: "#D32F2F" },
 	unbanBtn: { backgroundColor: "#2E7D32" },
