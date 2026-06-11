@@ -18,6 +18,7 @@ const SearchScreen = ({ navigation }) => {
 
 	const [query, setQuery] = useState('');
 	const [selectedCategory, setSelectedCategory] = useState(null);
+	const [sortBy, setSortBy] = useState('newest');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [searched, setSearched] = useState(false);
@@ -29,13 +30,14 @@ const SearchScreen = ({ navigation }) => {
 		dispatch(fetchCategories());
 	}, [dispatch]);
 
-	const doSearch = useCallback(async (searchQuery, catId) => {
+	const doSearch = useCallback(async (searchQuery, catId, sort) => {
 		setLoading(true);
 		setSearched(true);
 		setDisplayCount(PAGE_SIZE);
 		try {
 			let url = `${API_URL}/stories/search?q=${encodeURIComponent(searchQuery || '')}`;
 			if (catId) url += `&category_id=${catId}`;
+			if (sort) url += `&sort=${sort}`;
 			const data = await fetch(url).then(r => r.json());
 			setResults(data.status === "success" ? data.data : []);
 		} catch {
@@ -49,17 +51,17 @@ const SearchScreen = ({ navigation }) => {
 		setQuery(text);
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		if (text.length > 0) {
-			debounceRef.current = setTimeout(() => doSearch(text, selectedCategory), 500);
+			debounceRef.current = setTimeout(() => doSearch(text, selectedCategory, sortBy), 500);
 		} else {
 			setResults([]);
 			setSearched(false);
 		}
 	};
 
-	// Tự động search khi chọn thể loại
+	// Tự động search khi chọn thể loại hoặc đổi sắp xếp
 	useEffect(() => {
-		if (selectedCategory !== null) doSearch(query, selectedCategory);
-	}, [selectedCategory]);
+		if (searched || selectedCategory !== null) doSearch(query, selectedCategory, sortBy);
+	}, [selectedCategory, sortBy]);
 
 	const displayed = results.slice(0, displayCount);
 	const hasMore = displayCount < results.length;
@@ -103,7 +105,7 @@ const SearchScreen = ({ navigation }) => {
 					placeholderTextColor="#BBBBBB"
 					value={query}
 					onChangeText={handleQueryChange}
-					onSubmitEditing={() => doSearch(query, selectedCategory)}
+					onSubmitEditing={() => doSearch(query, selectedCategory, sortBy)}
 					returnKeyType="search"
 				/>
 				{query.length > 0 && (
@@ -111,6 +113,22 @@ const SearchScreen = ({ navigation }) => {
 						<MaterialIcons name="close" size={18} color="#BBBBBB" />
 					</TouchableOpacity>
 				)}
+			</View>
+
+			<View style={styles.sortRow}>
+				<MaterialIcons name="sort" size={14} color="#888888" />
+				<TouchableOpacity
+					style={[styles.sortChip, sortBy === 'newest' && styles.sortChipActive]}
+					onPress={() => setSortBy('newest')}
+				>
+					<Text style={[styles.sortChipText, sortBy === 'newest' && styles.sortChipTextActive]}>Mới nhất</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.sortChip, sortBy === 'views' && styles.sortChipActive]}
+					onPress={() => setSortBy('views')}
+				>
+					<Text style={[styles.sortChipText, sortBy === 'views' && styles.sortChipTextActive]}>Xem nhiều nhất</Text>
+				</TouchableOpacity>
 			</View>
 
 			<View style={styles.chipRow}>
@@ -196,6 +214,11 @@ const styles = StyleSheet.create({
 	cardDesc: { fontSize: 11, color: "#888888", lineHeight: 16, marginTop: 4 },
 	loadMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5", marginTop: 4, marginBottom: 8 },
 	loadMoreText: { fontSize: 13, fontWeight: "700", color: "#8B4513" },
+	sortRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+	sortChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5" },
+	sortChipActive: { backgroundColor: "#F2E8E3", borderColor: "#8B4513" },
+	sortChipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
+	sortChipTextActive: { color: "#8B4513" },
 });
 
 export default SearchScreen;

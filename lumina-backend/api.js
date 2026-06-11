@@ -18,6 +18,20 @@ var con = mysql.createConnection({
 con.connect(function (err) {
     if (err) throw err;
     console.log("Connected to AppDocTruyen Database!!!");
+    con.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            message TEXT NOT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `, (e) => { if (e) console.log('notifications table:', e.message); });
+    // Thêm cột unlock_at vào chapters nếu chưa có
+    con.query(`ALTER TABLE chapters ADD COLUMN unlock_at DATETIME NULL`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('unlock_at col:', e.message);
+    });
 });
 
 // ================= API ENDPOINTS =================
@@ -119,7 +133,7 @@ app.get('/api/stories/top', (req, res) => {
 
 // 4.1. Tìm kiếm truyện (phải đặt TRƯỚC /api/stories/:id)
 app.get('/api/stories/search', (req, res) => {
-    const { q = '', category_id } = req.query;
+    const { q = '', category_id, sort } = req.query;
     let sql = `
         SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
         FROM stories s
@@ -133,6 +147,7 @@ app.get('/api/stories/search', (req, res) => {
         sql += ` AND s.category_id = ?`;
         params.push(category_id);
     }
+    sql += sort === 'views' ? ' ORDER BY s.views DESC' : ' ORDER BY s.created_at DESC';
     con.query(sql, params, (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", data: results });
@@ -171,14 +186,14 @@ app.get('/api/stories/:id', (req, res) => {
 // 6. Lấy danh sách chương của một truyện
 app.get('/api/stories/:storyId/chapters', (req, res) => {
     const { storyId } = req.params;
-    const sql = `SELECT id, chapter_number, title, is_vip, created_at FROM chapters WHERE story_id = ? ORDER BY chapter_number ASC`;
+    const sql = `SELECT id, chapter_number, title, unlock_at, created_at FROM chapters WHERE story_id = ? ORDER BY chapter_number ASC`;
     con.query(sql, [storyId], (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", data: results });
     });
 });
 
-// 7. Lấy nội dung chi tiết của một chương (VIP enforcement)
+// 7. Lấy nội dung chi tiết của một chương (unlock_at enforcement)
 app.get('/api/chapters/:id', (req, res) => {
     const { id } = req.params;
     const { user_id } = req.query;
@@ -186,14 +201,20 @@ app.get('/api/chapters/:id', (req, res) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         if (results.length === 0) return res.status(404).json({ status: "error", message: "Không tìm thấy chương" });
         const chapter = results[0];
-        if (!chapter.is_vip) return res.json({ status: "success", data: chapter });
-        if (!user_id) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+        const isLocked = chapter.unlock_at && new Date(chapter.unlock_at) > new Date();
+        if (!isLocked) return res.json({ status: "success", data: chapter });
+        // Chương chưa đến ngày mở khóa
+        const unlockDate = new Date(chapter.unlock_at).toLocaleString('vi-VN', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        const lockedMsg = `Chương này sẽ mở khóa vào ${unlockDate}. Thành viên VIP có thể đọc ngay.`;
+        if (!user_id) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
         con.query(`SELECT is_vip, role_id FROM users WHERE id = ?`, [user_id], (err2, users) => {
-            if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+            if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
             const u = users[0];
-            // VIP users, Authors (role_id=2), Admins (role_id=1) đều được đọc
+            // VIP, Admin (role_id=1), Author (role_id=2) được đọc trước ngày mở khóa
             if (!u.is_vip && u.role_id !== 1 && u.role_id !== 2)
-                return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+                return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
             res.json({ status: "success", data: chapter });
         });
     });
@@ -385,12 +406,12 @@ app.post('/api/stories', (req, res) => {
 // 21. Thêm chương vào truyện (chapter_number tự động)
 app.post('/api/stories/:storyId/chapters', (req, res) => {
     const { storyId } = req.params;
-    const { title, content, is_vip } = req.body;
+    const { title, content, unlock_at } = req.body;
     con.query(`SELECT COALESCE(MAX(chapter_number), 0) + 1 as next_num FROM chapters WHERE story_id = ?`, [storyId], (err, rows) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         const chapter_number = rows[0].next_num;
-        const sql = `INSERT INTO chapters (story_id, chapter_number, title, content, is_vip) VALUES (?, ?, ?, ?, ?)`;
-        con.query(sql, [storyId, chapter_number, title, content, is_vip || false], (err2, result) => {
+        const sql = `INSERT INTO chapters (story_id, chapter_number, title, content, unlock_at) VALUES (?, ?, ?, ?, ?)`;
+        con.query(sql, [storyId, chapter_number, title, content, unlock_at || null], (err2, result) => {
             if (err2) return res.status(500).json({ status: "error", message: err2.message });
             res.json({ status: "success", id: result.insertId, chapter_number });
         });
@@ -409,10 +430,10 @@ app.delete('/api/chapters/:id', (req, res) => {
 // 22.1. Sửa chương
 app.put('/api/chapters/:id', (req, res) => {
     const { id } = req.params;
-    const { title, content, is_vip } = req.body;
+    const { title, content, unlock_at } = req.body;
     con.query(
-        `UPDATE chapters SET title = ?, content = ?, is_vip = ? WHERE id = ?`,
-        [title, content, is_vip ? 1 : 0, id],
+        `UPDATE chapters SET title = ?, content = ?, unlock_at = ? WHERE id = ?`,
+        [title, content, unlock_at || null, id],
         (err) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             res.json({ status: "success" });
@@ -585,14 +606,33 @@ app.get('/api/admin/stories/pending', (req, res) => {
 app.put('/api/admin/stories/:id/status', (req, res) => {
     const { id } = req.params;
     const { status, rejection_reason } = req.body;
-    con.query(
-        `UPDATE stories SET status = ?, rejection_reason = ? WHERE id = ?`,
-        [status, rejection_reason || null, id],
-        (err) => {
-            if (err) return res.status(500).json({ status: "error", message: err.message });
-            res.json({ status: "success" });
-        }
-    );
+    con.query(`SELECT title, author_id FROM stories WHERE id = ?`, [id], (err, stories) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (!stories[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy truyện" });
+        const story = stories[0];
+        con.query(
+            `UPDATE stories SET status = ?, rejection_reason = ? WHERE id = ?`,
+            [status, rejection_reason || null, id],
+            (err2) => {
+                if (err2) return res.status(500).json({ status: "error", message: err2.message });
+                let type, msg;
+                if (status === 'published') {
+                    type = 'story_approved';
+                    msg = `Truyện "${story.title}" của bạn đã được duyệt và phát hành!`;
+                } else if (status === 'rejected') {
+                    type = 'story_rejected';
+                    msg = `Truyện "${story.title}" của bạn đã bị từ chối.${rejection_reason ? ' Lý do: ' + rejection_reason : ''}`;
+                }
+                if (type) {
+                    con.query(`INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)`,
+                        [story.author_id, type, msg],
+                        (e3) => { if (e3) console.log('notif insert:', e3.message); }
+                    );
+                }
+                res.json({ status: "success" });
+            }
+        );
+    });
 });
 
 // 25. Lấy danh sách người dùng
@@ -614,6 +654,50 @@ app.put('/api/admin/users/:id/status', (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // 'active' hoặc 'banned'
     con.query(`UPDATE users SET status = ? WHERE id = ?`, [status, id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success" });
+    });
+});
+
+// ========== QUÊN MẬT KHẨU ==========
+
+app.post('/api/reset-password', (req, res) => {
+    const { username, email, new_password } = req.body;
+    if (!username || !email || !new_password)
+        return res.status(400).json({ status: "error", message: "Thiếu thông tin." });
+    con.query(`SELECT id FROM users WHERE username = ? AND LOWER(email) = LOWER(?)`, [username, email], (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (results.length === 0)
+            return res.status(400).json({ status: "error", message: "Tên đăng nhập hoặc email không đúng." });
+        con.query(`UPDATE users SET password = ? WHERE id = ?`, [new_password, results[0].id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            res.json({ status: "success" });
+        });
+    });
+});
+
+// ========== THÔNG BÁO ==========
+
+// Phải đặt TRƯỚC /:userId để tránh conflict
+app.get('/api/notifications/:userId/unread-count', (req, res) => {
+    const { userId } = req.params;
+    con.query(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0`, [userId], (err, r) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", count: r[0].count });
+    });
+});
+
+app.get('/api/notifications/:userId', (req, res) => {
+    const { userId } = req.params;
+    con.query(`SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`, [userId], (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
+app.put('/api/notifications/read/:userId', (req, res) => {
+    const { userId } = req.params;
+    con.query(`UPDATE notifications SET is_read = 1 WHERE user_id = ?`, [userId], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success" });
     });

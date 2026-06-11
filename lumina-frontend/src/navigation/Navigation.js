@@ -10,6 +10,7 @@ import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
 import LoginScreen from "../screens/guest/LoginScreen";
 import RegisterScreen from "../screens/guest/RegisterScreen";
 import ChapterReadScreen from "../screens/guest/ChapterReadScreen";
+import ForgotPasswordScreen from "../screens/guest/ForgotPasswordScreen";
 import SearchScreen from "../screens/guest/SearchScreen";
 import UserNavigation from "./UserNavigation";
 
@@ -128,6 +129,7 @@ const Navigation = () => {
 				<Stack.Screen name="Guest" component={GuestTabs} />
 				<Stack.Screen name="Login" component={LoginScreen} />
 				<Stack.Screen name="Register" component={RegisterScreen} />
+				<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 				<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
 				<Stack.Screen name="Reader" component={UserNavigation} />
 			</Stack.Navigator>

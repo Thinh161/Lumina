@@ -25,7 +25,7 @@ const THEMES = {
 const ChapterReadScreen = ({ navigation, route }) => {
 	const { chapterId, storyId } = route.params || {};
 	const dispatch = useDispatch();
-	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked } = useSelector(state => state.story);
+	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked, vipBlockedMessage } = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
 	const scrollPositionRef = useRef(0);
 	const [progress, setProgress] = useState(0);
@@ -65,8 +65,8 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	useEffect(() => {
 		if (vipBlocked) {
 			Alert.alert(
-				"Nội dung VIP",
-				"Chương này dành riêng cho thành viên VIP. Hãy nâng cấp tài khoản để đọc.",
+				"Chương chưa mở khóa",
+				vipBlockedMessage || "Chương này chưa mở khóa. Thành viên VIP có thể đọc ngay.",
 				[{ text: "Quay lại", onPress: () => navigation.goBack() }]
 			);
 		}

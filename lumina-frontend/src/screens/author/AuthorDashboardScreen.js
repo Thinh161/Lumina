@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Switch, Image
+	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Image
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
@@ -34,9 +34,18 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	const [editingChapter, setEditingChapter] = useState(null);
 	const [chapTitle, setChapTitle] = useState('');
 	const [chapContent, setChapContent] = useState('');
-	const [chapIsVip, setChapIsVip] = useState(false);
+	const [chapUnlockAt, setChapUnlockAt] = useState('');
 	const [savingChap, setSavingChap] = useState(false);
 	const [chapContentLoading, setChapContentLoading] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
+
+	const loadUnreadCount = useCallback(async () => {
+		if (!user) return;
+		try {
+			const res = await fetch(`${API_URL}/notifications/${user.id}/unread-count`).then(r => r.json());
+			setUnreadCount(res.count || 0);
+		} catch {}
+	}, [user]);
 
 	const loadData = useCallback(async () => {
 		setLoading(true);
@@ -50,7 +59,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 		} finally { setLoading(false); }
 	}, [user]);
 
-	useEffect(() => { loadData(); }, [loadData]);
+	useEffect(() => { loadData(); loadUnreadCount(); }, [loadData, loadUnreadCount]);
 
 	const openNewStory = () => {
 		setEditingStory(null);
@@ -118,10 +127,24 @@ const AuthorDashboardScreen = ({ navigation }) => {
 		]);
 	};
 
+	const parseDateInput = (str) => {
+		if (!str.trim()) return null;
+		const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+		if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+		if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str;
+		return null;
+	};
+
 	const openEditChapter = async (chapter) => {
 		setEditingChapter(chapter);
 		setChapTitle(chapter.title || '');
-		setChapIsVip(!!chapter.is_vip);
+		// Hiển thị unlock_at theo DD/MM/YYYY nếu có
+		if (chapter.unlock_at) {
+			const d = new Date(chapter.unlock_at);
+			setChapUnlockAt(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
+		} else {
+			setChapUnlockAt('');
+		}
 		setChapContent('');
 		setChapContentLoading(true);
 		try {
@@ -132,15 +155,21 @@ const AuthorDashboardScreen = ({ navigation }) => {
 
 	const handleSaveChapter = async () => {
 		if (!chapTitle.trim() || !chapContent.trim()) { Alert.alert("Lỗi", "Cần điền tiêu đề và nội dung."); return; }
+		let unlockDate = null;
+		if (chapUnlockAt.trim()) {
+			unlockDate = parseDateInput(chapUnlockAt);
+			if (!unlockDate) { Alert.alert("Lỗi", "Định dạng ngày không hợp lệ. Dùng DD/MM/YYYY."); return; }
+		}
 		setSavingChap(true);
 		try {
 			const res = await fetch(`${API_URL}/chapters/${editingChapter.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: chapTitle, content: chapContent, is_vip: chapIsVip }),
+				body: JSON.stringify({ title: chapTitle, content: chapContent, unlock_at: unlockDate }),
 			}).then(r => r.json());
 			if (res.status === "success") {
-				setStoryChapters(prev => prev.map(c => c.id === editingChapter.id ? { ...c, title: chapTitle, is_vip: chapIsVip } : c));
+				const newUnlockAt = chapUnlockAt.trim() ? parseDateInput(chapUnlockAt) : null;
+				setStoryChapters(prev => prev.map(c => c.id === editingChapter.id ? { ...c, title: chapTitle, unlock_at: newUnlockAt } : c));
 				setEditingChapter(null);
 				Alert.alert("Đã lưu", "Chương đã được cập nhật.");
 			} else Alert.alert("Lỗi", res.message);
@@ -186,10 +215,20 @@ const AuthorDashboardScreen = ({ navigation }) => {
 					<Text style={s.headerTitle}>Quản lý truyện</Text>
 					<Text style={s.headerSub}>Xin chào, {user?.full_name || user?.username}</Text>
 				</View>
-				<TouchableOpacity style={s.btn} onPress={openNewStory}>
-					<MaterialIcons name="add" size={18} color="#fff" />
-					<Text style={s.btnText}>Đăng truyện</Text>
-				</TouchableOpacity>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+					<TouchableOpacity style={s.bellBtn} onPress={() => { setUnreadCount(0); navigation.navigate("Notifications"); }}>
+						<MaterialIcons name="notifications" size={22} color="#8B4513" />
+						{unreadCount > 0 && (
+							<View style={s.badge}>
+								<Text style={s.badgeCount}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+							</View>
+						)}
+					</TouchableOpacity>
+					<TouchableOpacity style={s.btn} onPress={openNewStory}>
+						<MaterialIcons name="add" size={18} color="#fff" />
+						<Text style={s.btnText}>Đăng truyện</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 
 			{loading ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
@@ -268,7 +307,12 @@ const AuthorDashboardScreen = ({ navigation }) => {
 									<View key={chap.id} style={s.chapRow}>
 										<View style={{ flex: 1 }}>
 											<Text style={s.chapRowTitle}>Chương {chap.chapter_number}: {chap.title}</Text>
-											{chap.is_vip ? <Text style={s.chapVipBadge}>VIP</Text> : null}
+											{chap.unlock_at && new Date(chap.unlock_at) > new Date()
+												? <Text style={s.chapVipBadge}>
+													Mở khóa {new Date(chap.unlock_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+												</Text>
+												: null
+											}
 										</View>
 										<TouchableOpacity style={s.iconBtn} onPress={() => openEditChapter(chap)}>
 											<MaterialIcons name="edit" size={18} color="#8B4513" />
@@ -318,9 +362,17 @@ const AuthorDashboardScreen = ({ navigation }) => {
 									</>
 								)}
 							</View>
-							<View style={[s.field, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-								<Text style={s.fieldLabel}>Chương VIP</Text>
-								<Switch value={chapIsVip} onValueChange={setChapIsVip} trackColor={{ false: "#EBEBEB", true: "rgba(139,69,19,0.4)" }} thumbColor={chapIsVip ? "#8B4513" : "#BBBBBB"} />
+							<View style={s.field}>
+								<Text style={s.fieldLabel}>Ngày mở khóa</Text>
+								<TextInput
+									style={s.input}
+									value={chapUnlockAt}
+									onChangeText={setChapUnlockAt}
+									placeholder="DD/MM/YYYY — để trống nếu luôn công khai"
+									placeholderTextColor="#BBBBBB"
+									keyboardType="numbers-and-punctuation"
+								/>
+								<Text style={{ fontSize: 11, color: "#8B4513", marginTop: 4 }}>VIP có thể đọc trước ngày mở khóa</Text>
 							</View>
 							<TouchableOpacity style={[s.submitBtn, savingChap && { opacity: 0.6 }]} onPress={handleSaveChapter} disabled={savingChap}>
 								{savingChap ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>Lưu thay đổi</Text>}
@@ -374,6 +426,9 @@ const s = StyleSheet.create({
 	chapRowTitle: { fontSize: 14, fontWeight: "600", color: "#1A1A1A" },
 	chapVipBadge: { fontSize: 10, color: "#8B4513", fontWeight: "700", marginTop: 2 },
 	iconBtn: { padding: 8 },
+	bellBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
+	badge: { position: 'absolute', top: 2, right: 2, backgroundColor: '#D32F2F', borderRadius: 999, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+	badgeCount: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' },
 });
 
 export default AuthorDashboardScreen;

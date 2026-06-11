@@ -56,7 +56,7 @@ const LoginScreen = ({ navigation }) => {
 						<View style={s.field}>
 							<View style={s.labelRow}>
 								<Text style={s.label}>Mật khẩu</Text>
-								<TouchableOpacity><Text style={s.forgot}>Quên mật khẩu?</Text></TouchableOpacity>
+								<TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}><Text style={s.forgot}>Quên mật khẩu?</Text></TouchableOpacity>
 							</View>
 							<View style={s.passWrap}>
 								<TextInput

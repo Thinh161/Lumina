@@ -255,28 +255,29 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							</View>
 							<View style={styles.chapterList}>
 								{currentChapters.length > 0 ? (
-									(showAllChapters ? currentChapters : currentChapters.slice(0, CHAPTERS_PREVIEW)).map(chapter => (
-										<TouchableOpacity
-											key={chapter.id}
-											style={[styles.chapterItem, !chapter.is_vip && styles.chapterItemOpen, chapter.is_vip && styles.chapterItemLocked]}
-											onPress={() => {
-												if (chapter.is_vip && !user?.is_vip) {
-													Alert.alert("Nội dung VIP", "Chương này dành riêng cho thành viên VIP.");
-													return;
+									(showAllChapters ? currentChapters : currentChapters.slice(0, CHAPTERS_PREVIEW)).map(chapter => {
+										const isLocked = chapter.unlock_at && new Date(chapter.unlock_at) > new Date();
+										const unlockLabel = isLocked
+											? new Date(chapter.unlock_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+											: null;
+										return (
+											<TouchableOpacity
+												key={chapter.id}
+												style={[styles.chapterItem, !isLocked && styles.chapterItemOpen, isLocked && styles.chapterItemLocked]}
+												onPress={() => navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id })}
+											>
+												<View style={{ flex: 1 }}>
+													<Text style={[styles.chapterMeta, !isLocked && styles.chapterMetaOpen]}>Chương {chapter.chapter_number}</Text>
+													<Text style={styles.chapterTitle}>{chapter.title}</Text>
+													{isLocked && <Text style={styles.chapterUnlockDate}>Mở khóa {unlockLabel}</Text>}
+												</View>
+												{!isLocked
+													? <MaterialIcons name="lock-open" size={18} color="#8B4513" />
+													: <MaterialIcons name="lock" size={18} color={user?.is_vip ? "#8B4513" : "#BBBBBB"} />
 												}
-												navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id });
-											}}
-										>
-											<View style={{ flex: 1 }}>
-												<Text style={[styles.chapterMeta, !chapter.is_vip && styles.chapterMetaOpen]}>Chương {chapter.chapter_number}</Text>
-												<Text style={styles.chapterTitle}>{chapter.title}</Text>
-											</View>
-											{!chapter.is_vip
-												? <MaterialIcons name="lock-open" size={18} color="#8B4513" />
-												: <MaterialIcons name="lock" size={18} color={user?.is_vip ? "#8B4513" : "#BBBBBB"} />
-											}
-										</TouchableOpacity>
-									))
+											</TouchableOpacity>
+										);
+									})
 								) : (
 									<Text style={{ textAlign: "center", color: "#888888", marginVertical: 10 }}>
 										Truyện chưa cập nhật chương nào.
@@ -461,6 +462,7 @@ const styles = StyleSheet.create({
 	chapterMeta: { fontSize: 11, color: "#AAAAAA" },
 	chapterMetaOpen: { color: "#8B4513" },
 	chapterTitle: { fontSize: 13, fontWeight: "600", color: "#1A1A1A", marginTop: 2 },
+	chapterUnlockDate: { fontSize: 10, color: "#E65100", marginTop: 2 },
 	viewAllButton: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
 	viewAllText: { fontSize: 13, fontWeight: "700", color: "#8B4513" },
 	commentsSection: { marginTop: 0, backgroundColor: "#FAFAFA", borderRadius: 12, padding: 14, gap: 12, borderWidth: 1, borderColor: "#F0F0F0" },

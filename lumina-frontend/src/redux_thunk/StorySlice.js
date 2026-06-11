@@ -84,6 +84,7 @@ const storySlice = createSlice({
 		loading: false,
 		error: null,
 		vipBlocked: false,
+		vipBlockedMessage: '',
 	},
 	reducers: {
 		clearCurrentStory: (state) => {
@@ -93,6 +94,7 @@ const storySlice = createSlice({
 		clearChapterContent: (state) => {
 			state.currentChapterContent = null;
 			state.vipBlocked = false;
+			state.vipBlockedMessage = '';
 		}
 	},
 	extraReducers: (builder) => {
@@ -141,6 +143,7 @@ const storySlice = createSlice({
 			.addCase(fetchChapterContent.pending, (state) => {
 				state.loading = true;
 				state.vipBlocked = false;
+				state.vipBlockedMessage = '';
 			})
 			.addCase(fetchChapterContent.fulfilled, (state, action) => {
 				state.loading = false;
@@ -149,7 +152,10 @@ const storySlice = createSlice({
 			.addCase(fetchChapterContent.rejected, (state, action) => {
 				state.loading = false;
 				state.error = action.payload?.message || action.payload;
-				if (action.payload?.code === 'VIP_REQUIRED') state.vipBlocked = true;
+				if (action.payload?.code === 'VIP_REQUIRED') {
+					state.vipBlocked = true;
+					state.vipBlockedMessage = action.payload?.message || '';
+				}
 			});
 	}
 });

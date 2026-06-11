@@ -1,17 +1,27 @@
 import React, { useState } from "react";
 import {
 	View, Text, TextInput, TouchableOpacity, StyleSheet,
-	SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch
+	SafeAreaView, ScrollView, Alert, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { API_URL } from '../../config/api';
 
+const parseDateInput = (str) => {
+	if (!str.trim()) return null;
+	// DD/MM/YYYY
+	const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+	if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+	// YYYY-MM-DD
+	if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str;
+	return null;
+};
+
 const AddChapterScreen = ({ navigation, route }) => {
 	const { storyId, storyTitle } = route.params || {};
 	const [title, setTitle] = useState('');
 	const [content, setContent] = useState('');
-	const [isVip, setIsVip] = useState(false);
+	const [unlockAt, setUnlockAt] = useState('');
 	const [saving, setSaving] = useState(false);
 
 	const handleSave = async () => {
@@ -19,12 +29,20 @@ const AddChapterScreen = ({ navigation, route }) => {
 			Alert.alert("Lỗi", "Vui lòng điền tiêu đề và nội dung.");
 			return;
 		}
+		let unlockDate = null;
+		if (unlockAt.trim()) {
+			unlockDate = parseDateInput(unlockAt);
+			if (!unlockDate) {
+				Alert.alert("Lỗi", "Định dạng ngày không hợp lệ. Dùng DD/MM/YYYY hoặc YYYY-MM-DD.");
+				return;
+			}
+		}
 		setSaving(true);
 		try {
 			const res = await fetch(`${API_URL}/stories/${storyId}/chapters`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: title.trim(), content: content.trim(), is_vip: isVip }),
+				body: JSON.stringify({ title: title.trim(), content: content.trim(), unlock_at: unlockDate }),
 			}).then(r => r.json());
 
 			if (res.status === "success") {
@@ -55,17 +73,20 @@ const AddChapterScreen = ({ navigation, route }) => {
 			</View>
 
 			<ScrollView contentContainerStyle={s.content}>
-				<View style={s.vipRow}>
+				<View style={s.unlockRow}>
+					<MaterialIcons name="schedule" size={18} color="#8B4513" style={{ marginTop: 2 }} />
 					<View style={{ flex: 1 }}>
-						<Text style={s.label}>Chương VIP</Text>
-						<Text style={s.vipSub}>Chỉ thành viên VIP mới đọc được</Text>
+						<Text style={s.label}>Ngày mở khóa</Text>
+						<TextInput
+							style={s.dateInput}
+							value={unlockAt}
+							onChangeText={setUnlockAt}
+							placeholder="DD/MM/YYYY — để trống nếu luôn công khai"
+							placeholderTextColor="#BBBBBB"
+							keyboardType="numbers-and-punctuation"
+						/>
+						<Text style={s.unlockHint}>VIP có thể đọc trước ngày mở khóa</Text>
 					</View>
-					<Switch
-						value={isVip}
-						onValueChange={setIsVip}
-						trackColor={{ false: "#EBEBEB", true: "rgba(139,69,19,0.4)" }}
-						thumbColor={isVip ? "#8B4513" : "#BBBBBB"}
-					/>
 				</View>
 
 				<View style={s.field}>
@@ -105,8 +126,9 @@ const s = StyleSheet.create({
 	saveBtn: { backgroundColor: "#8B4513", paddingHorizontal: 16, paddingVertical: 7, borderRadius: 999 },
 	saveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
 	content: { padding: 16, gap: 16 },
-	vipRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#F5F0EB", padding: 14, borderRadius: 10, borderWidth: 1, borderColor: "#E8D5C4" },
-	vipSub: { fontSize: 11, color: "#8B4513", marginTop: 2 },
+	unlockRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: "#F5F0EB", padding: 14, borderRadius: 10, borderWidth: 1, borderColor: "#E8D5C4" },
+	dateInput: { backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E8D5C4", paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: "#1A1A1A", marginTop: 6 },
+	unlockHint: { fontSize: 11, color: "#8B4513", marginTop: 4 },
 	field: { gap: 6 },
 	label: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
 	input: { backgroundColor: "#F5F5F5", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: "#1A1A1A" },
