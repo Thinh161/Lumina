@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
 	View, Text, StyleSheet, SafeAreaView, ScrollView,
-	Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator,
+	Image, TouchableOpacity, Alert, Modal, ActivityIndicator,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -12,11 +12,19 @@ const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ88
 
 import { API_URL } from '../../config/api';
 
+const BANK_INFO = {
+	bank: 'Vietcombank',
+	account: '1234 5678 9012',
+	owner: 'NGUYEN VAN ADMIN',
+};
+
 const TOPUP_PACKAGES = [
-	{ label: "10.000đ", amount: 10 },
-	{ label: "50.000đ", amount: 50 },
-	{ label: "100.000đ", amount: 100 },
-	{ label: "200.000đ", amount: 200 },
+	{ label: "10.000đ", vnd: 10000, xu: 10 },
+	{ label: "20.000đ", vnd: 20000, xu: 20 },
+	{ label: "50.000đ", vnd: 50000, xu: 50 },
+	{ label: "100.000đ", vnd: 100000, xu: 100 },
+	{ label: "200.000đ", vnd: 200000, xu: 200 },
+	{ label: "500.000đ", vnd: 500000, xu: 500 },
 ];
 
 const ProfileScreen = ({ navigation }) => {
@@ -28,7 +36,8 @@ const ProfileScreen = ({ navigation }) => {
 	const isAdmin = user?.role_id === 1;
 
 	const [showTopup, setShowTopup] = useState(false);
-	const [topupAmount, setTopupAmount] = useState('');
+	const [topupStep, setTopupStep] = useState(1);
+	const [selectedPkg, setSelectedPkg] = useState(null);
 	const [topupLoading, setTopupLoading] = useState(false);
 	const [unreadCount, setUnreadCount] = useState(0);
 
@@ -74,22 +83,21 @@ const ProfileScreen = ({ navigation }) => {
 	};
 
 	const handleTopup = async () => {
-		const amount = parseInt(topupAmount, 10);
-		if (!amount || amount <= 0) { Alert.alert("Lỗi", "Vui lòng nhập số xu hợp lệ."); return; }
+		if (!selectedPkg) return;
 		setTopupLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/users/${user.id}/balance`, {
-				method: 'PUT',
+			const res = await fetch(`${API_URL}/topup/request`, {
+				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ amount }),
+				body: JSON.stringify({ user_id: user.id, amount_vnd: selectedPkg.vnd, amount_xu: selectedPkg.xu }),
 			}).then(r => r.json());
 			if (res.status === 'success') {
-				dispatch(fetchUserProfile(user.id));
 				setShowTopup(false);
-				setTopupAmount('');
-				Alert.alert("Nạp xu thành công", `Số dư mới: ${Number(res.balance).toLocaleString("vi-VN")} xu`);
+				setTopupStep(1);
+				setSelectedPkg(null);
+				Alert.alert("Đã ghi nhận", "Admin sẽ kiểm tra chuyển khoản và cộng xu cho bạn trong vài phút.");
 			} else {
-				Alert.alert("Lỗi", res.message || "Nạp xu thất bại.");
+				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
 			}
 		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
 		finally { setTopupLoading(false); }
@@ -272,34 +280,71 @@ const ProfileScreen = ({ navigation }) => {
 				<View style={styles.overlay}>
 					<View style={styles.sheet}>
 						<View style={styles.sheetHeader}>
-							<Text style={styles.sheetTitle}>Nạp Xu</Text>
-							<TouchableOpacity onPress={() => { setShowTopup(false); setTopupAmount(''); }}>
+							<Text style={styles.sheetTitle}>{topupStep === 1 ? 'Chọn gói nạp xu' : 'Thông tin chuyển khoản'}</Text>
+							<TouchableOpacity onPress={() => { setShowTopup(false); setTopupStep(1); setSelectedPkg(null); }}>
 								<MaterialIcons name="close" size={22} color="#888888" />
 							</TouchableOpacity>
 						</View>
-						<Text style={styles.sheetSub}>Chọn gói hoặc nhập số xu muốn nạp</Text>
-						<View style={styles.packageRow}>
-							{TOPUP_PACKAGES.map(p => (
+
+						{topupStep === 1 ? (
+							<>
+								<Text style={styles.sheetSub}>10.000đ = 10 xu • Chọn gói phù hợp</Text>
+								<View style={styles.packageRow}>
+									{TOPUP_PACKAGES.map(p => (
+										<TouchableOpacity
+											key={p.vnd}
+											style={[styles.packageBtn, selectedPkg?.vnd === p.vnd && styles.packageBtnActive]}
+											onPress={() => setSelectedPkg(p)}
+										>
+											<Text style={[styles.packageBtnText, selectedPkg?.vnd === p.vnd && styles.packageBtnTextActive]}>{p.label}</Text>
+											<Text style={[styles.packageBtnXu, selectedPkg?.vnd === p.vnd && { color: '#FFFFFF' }]}>{p.xu} xu</Text>
+										</TouchableOpacity>
+									))}
+								</View>
 								<TouchableOpacity
-									key={p.amount}
-									style={[styles.packageBtn, topupAmount === String(p.amount) && styles.packageBtnActive]}
-									onPress={() => setTopupAmount(String(p.amount))}
+									style={[styles.topupSubmitBtn, !selectedPkg && { opacity: 0.4 }]}
+									onPress={() => selectedPkg && setTopupStep(2)}
+									disabled={!selectedPkg}
 								>
-									<Text style={[styles.packageBtnText, topupAmount === String(p.amount) && styles.packageBtnTextActive]}>{p.label}</Text>
+									<Text style={styles.topupSubmitText}>Tiếp theo</Text>
+									<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
 								</TouchableOpacity>
-							))}
-						</View>
-						<TextInput
-							style={styles.topupInput}
-							value={topupAmount}
-							onChangeText={setTopupAmount}
-							placeholder="Hoặc nhập số xu..."
-							placeholderTextColor="#BBBBBB"
-							keyboardType="numeric"
-						/>
-						<TouchableOpacity style={[styles.topupSubmitBtn, topupLoading && { opacity: 0.6 }]} onPress={handleTopup} disabled={topupLoading}>
-							{topupLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.topupSubmitText}>Xác nhận nạp xu</Text>}
-						</TouchableOpacity>
+							</>
+						) : (
+							<>
+								<View style={styles.bankCard}>
+									{[
+										{ label: 'Ngân hàng', value: BANK_INFO.bank },
+										{ label: 'Số tài khoản', value: BANK_INFO.account, bold: true },
+										{ label: 'Chủ tài khoản', value: BANK_INFO.owner },
+										{ label: 'Số tiền', value: selectedPkg?.label, accent: true },
+									].map(r => (
+										<View key={r.label} style={styles.bankRow}>
+											<Text style={styles.bankLabel}>{r.label}</Text>
+											<Text style={[styles.bankValue, r.bold && { fontSize: 16 }, r.accent && { color: '#8B4513' }]}>{r.value}</Text>
+										</View>
+									))}
+								</View>
+								<View style={styles.transferNoteBox}>
+									<Text style={styles.transferNoteLabel}>Nội dung chuyển khoản:</Text>
+									<Text style={styles.transferNoteValue}>LUMINA {user?.username?.toUpperCase()} {selectedPkg?.vnd}</Text>
+								</View>
+								<Text style={styles.transferHint}>Sau khi chuyển khoản xong, ấn xác nhận bên dưới. Admin sẽ kiểm tra và cộng xu cho bạn.</Text>
+								<TouchableOpacity
+									style={[styles.topupSubmitBtn, topupLoading && { opacity: 0.6 }]}
+									onPress={handleTopup}
+									disabled={topupLoading}
+								>
+									{topupLoading
+										? <ActivityIndicator color="#fff" size="small" />
+										: <Text style={styles.topupSubmitText}>Đã chuyển khoản — Xác nhận</Text>
+									}
+								</TouchableOpacity>
+								<TouchableOpacity style={styles.backStepBtn} onPress={() => setTopupStep(1)}>
+									<Text style={styles.backStepText}>Chọn lại gói khác</Text>
+								</TouchableOpacity>
+							</>
+						)}
 					</View>
 				</View>
 			</Modal>
@@ -366,9 +411,19 @@ const styles = StyleSheet.create({
 	packageBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
 	packageBtnText: { fontSize: 13, fontWeight: "700", color: "#888888" },
 	packageBtnTextActive: { color: "#FFFFFF" },
-	topupInput: { backgroundColor: "#F5F5F5", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: "#1A1A1A" },
-	topupSubmitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center" },
+	packageBtnXu: { fontSize: 11, color: "#AAAAAA", marginTop: 2 },
+	topupSubmitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 },
 	topupSubmitText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+	bankCard: { backgroundColor: "#F9F6F3", borderRadius: 12, borderWidth: 1, borderColor: "#E8D5C4", padding: 16, gap: 10 },
+	bankRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+	bankLabel: { fontSize: 12, color: "#888888" },
+	bankValue: { fontSize: 14, fontWeight: "700", color: "#1A1A1A" },
+	transferNoteBox: { backgroundColor: "#FFF8F5", borderRadius: 10, borderWidth: 1, borderColor: "#F2D9C8", padding: 12 },
+	transferNoteLabel: { fontSize: 11, color: "#888888", marginBottom: 4 },
+	transferNoteValue: { fontSize: 15, fontWeight: "800", color: "#8B4513", letterSpacing: 0.5 },
+	transferHint: { fontSize: 12, color: "#888888", lineHeight: 18, textAlign: "center" },
+	backStepBtn: { alignItems: "center", paddingVertical: 8 },
+	backStepText: { fontSize: 13, color: "#8B4513", fontWeight: "600" },
 });
 
 export default ProfileScreen;

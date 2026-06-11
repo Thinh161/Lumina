@@ -15,6 +15,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 	const [filteredStories, setFilteredStories] = useState([]);
 	const [users, setUsers] = useState([]);
 	const [authorRequests, setAuthorRequests] = useState([]);
+	const [topupRequests, setTopupRequests] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [rejectTarget, setRejectTarget] = useState(null);
 	const [rejectReason, setRejectReason] = useState('');
@@ -34,6 +35,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 			} else if (tab === 'authors') {
 				const res = await fetch(`${API_URL}/admin/author-requests`).then(r => r.json());
 				setAuthorRequests(res.data || []);
+			} else if (tab === 'topup') {
+				const res = await fetch(`${API_URL}/admin/topup`).then(r => r.json());
+				setTopupRequests(res.data || []);
 			} else {
 				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
 				setUsers(res.data || []);
@@ -43,10 +47,12 @@ const AdminDashboardScreen = ({ navigation }) => {
 
 	useEffect(() => { loadData(); }, [loadData]);
 
-	// Load author request count for badge on every mount
+	// Load counts for badges on every mount
 	useEffect(() => {
 		fetch(`${API_URL}/admin/author-requests`).then(r => r.json())
 			.then(res => setAuthorRequests(res.data || [])).catch(() => {});
+		fetch(`${API_URL}/admin/topup`).then(r => r.json())
+			.then(res => setTopupRequests(res.data || [])).catch(() => {});
 	}, []);
 
 	const handleApprove = (storyId) => {
@@ -125,6 +131,31 @@ const AdminDashboardScreen = ({ navigation }) => {
 			{
 				text: "Duyệt", onPress: async () => {
 					await fetch(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
+	const handleApproveTopup = (id) => {
+		Alert.alert("Xác nhận nạp xu", "Bạn đã nhận được tiền chuyển khoản và muốn duyệt yêu cầu này?", [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Duyệt", onPress: async () => {
+					await fetch(`${API_URL}/admin/topup/${id}/approve`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
+	const handleRejectTopup = (id) => {
+		Alert.alert("Từ chối nạp xu", "Từ chối yêu cầu nạp xu này?", [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Từ chối", style: "destructive",
+				onPress: async () => {
+					await fetch(`${API_URL}/admin/topup/${id}/reject`, { method: 'PUT' });
 					loadData();
 				}
 			}
@@ -230,10 +261,41 @@ const AdminDashboardScreen = ({ navigation }) => {
 		</View>
 	);
 
+	const renderTopupRequest = ({ item }) => {
+		const date = new Date(item.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+		return (
+			<View style={s.card}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+					<Image source={{ uri: item.avatar || DEFAULT_COVER }} style={[s.avatar, { borderRadius: 8 }]} />
+					<View style={{ flex: 1 }}>
+						<Text style={s.cardTitle}>{item.full_name || item.username}</Text>
+						<Text style={s.cardMeta}>@{item.username}</Text>
+						<Text style={s.cardMeta}>{date}</Text>
+					</View>
+					<View style={{ alignItems: 'flex-end' }}>
+						<Text style={{ fontSize: 16, fontWeight: '800', color: '#8B4513' }}>{item.amount_xu} xu</Text>
+						<Text style={{ fontSize: 12, color: '#888888' }}>{Number(item.amount_vnd).toLocaleString('vi-VN')}đ</Text>
+					</View>
+				</View>
+				<View style={s.actions}>
+					<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveTopup(item.id)}>
+						<MaterialIcons name="check" size={16} color="#FFFFFF" />
+						<Text style={s.approveBtnText}>Xác nhận</Text>
+					</TouchableOpacity>
+					<TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => handleRejectTopup(item.id)}>
+						<MaterialIcons name="close" size={16} color="#FFFFFF" />
+						<Text style={s.rejectBtnText}>Từ chối</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		);
+	};
+
 	const TABS = [
 		{ key: 'stories', label: 'Truyện' },
 		{ key: 'authors', label: `Tác giả${authorRequests.length > 0 ? ` (${authorRequests.length})` : ''}` },
 		{ key: 'users', label: 'Người dùng' },
+		{ key: 'topup', label: `Nạp xu${topupRequests.length > 0 ? ` (${topupRequests.length})` : ''}` },
 	];
 
 	return (
@@ -279,6 +341,13 @@ const AdminDashboardScreen = ({ navigation }) => {
 				</View>
 			) : tab === 'authors' ? (
 				<FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
+			) : tab === 'topup' && topupRequests.length === 0 ? (
+				<View style={s.center}>
+					<MaterialIcons name="account-balance-wallet" size={52} color="#EBEBEB" />
+					<Text style={s.emptyText}>Không có yêu cầu nạp xu nào.</Text>
+				</View>
+			) : tab === 'topup' ? (
+				<FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
 			) : (
 				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
 			)}

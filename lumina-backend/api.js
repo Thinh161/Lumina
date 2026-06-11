@@ -32,6 +32,16 @@ con.connect(function (err) {
     con.query(`ALTER TABLE chapters ADD COLUMN unlock_at DATETIME NULL`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('unlock_at col:', e.message);
     });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS topup_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            amount_vnd INT NOT NULL,
+            amount_xu INT NOT NULL,
+            status ENUM('pending','approved','rejected') DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `, (e) => { if (e) console.log('topup_requests table:', e.message); });
 });
 
 // ================= API ENDPOINTS =================
@@ -664,6 +674,74 @@ app.put('/api/admin/users/:id/status', (req, res) => {
     con.query(`UPDATE users SET status = ? WHERE id = ?`, [status, id], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success" });
+    });
+});
+
+// ========== NẠP XU ==========
+
+app.post('/api/topup/request', (req, res) => {
+    const { user_id, amount_vnd, amount_xu } = req.body;
+    if (!user_id || !amount_vnd || !amount_xu)
+        return res.status(400).json({ status: "error", message: "Thiếu thông tin." });
+    con.query(
+        `INSERT INTO topup_requests (user_id, amount_vnd, amount_xu) VALUES (?, ?, ?)`,
+        [user_id, amount_vnd, amount_xu],
+        (err, result) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success", id: result.insertId });
+        }
+    );
+});
+
+app.get('/api/admin/topup', (req, res) => {
+    const sql = `
+        SELECT t.*, u.username, u.full_name
+        FROM topup_requests t
+        JOIN users u ON t.user_id = u.id
+        WHERE t.status = 'pending'
+        ORDER BY t.created_at ASC
+    `;
+    con.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
+app.put('/api/admin/topup/:id/approve', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT * FROM topup_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (!rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        const r = rows[0];
+        con.query(`UPDATE topup_requests SET status = 'approved' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [r.amount_xu, r.user_id], (err3) => {
+                if (err3) return res.status(500).json({ status: "error", message: err3.message });
+                con.query(
+                    `INSERT INTO notifications (user_id, type, message) VALUES (?, 'topup_approved', ?)`,
+                    [r.user_id, `Yêu cầu nạp xu của bạn đã được xác nhận. ${r.amount_xu} xu đã được cộng vào tài khoản!`],
+                    (e4) => { if (e4) console.log('notif insert:', e4.message); }
+                );
+                res.json({ status: "success" });
+            });
+        });
+    });
+});
+
+app.put('/api/admin/topup/:id/reject', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT user_id FROM topup_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        if (!rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        con.query(`UPDATE topup_requests SET status = 'rejected' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            con.query(
+                `INSERT INTO notifications (user_id, type, message) VALUES (?, 'topup_rejected', 'Yêu cầu nạp xu của bạn đã bị từ chối. Vui lòng liên hệ Admin để biết thêm.')`,
+                [rows[0].user_id],
+                (e3) => { if (e3) console.log('notif insert:', e3.message); }
+            );
+            res.json({ status: "success" });
+        });
     });
 });
 

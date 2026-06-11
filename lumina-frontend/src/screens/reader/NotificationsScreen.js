@@ -12,6 +12,8 @@ const NOTIF_ICONS = {
 	story_rejected: { name: 'cancel', color: '#D32F2F' },
 	author_approved: { name: 'verified-user', color: '#2E7D32' },
 	author_rejected: { name: 'block', color: '#D32F2F' },
+	topup_approved: { name: 'account-balance-wallet', color: '#2E7D32' },
+	topup_rejected: { name: 'money-off', color: '#D32F2F' },
 };
 
 const NotificationsScreen = ({ navigation }) => {
