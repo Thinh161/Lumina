@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 
 const AddChapterScreen = ({ navigation, route }) => {
 	const { storyId, storyTitle } = route.params || {};

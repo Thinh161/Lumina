@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../config/api';
 
 // 1. Thunk: Gọi API Đăng nhập
 export const loginUser = createAsyncThunk("auth/loginUser",

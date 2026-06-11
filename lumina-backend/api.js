@@ -52,7 +52,7 @@ app.post('/api/login', (req, res) => {
 app.get('/api/users/:id', (req, res) => {
     const { id } = req.params;
     const sql = `
-        SELECT id, username, email, full_name, avatar, balance, is_vip, role_id, status, created_at
+        SELECT id, username, email, full_name, avatar, balance, is_vip, role_id, status, created_at, author_request
         FROM users
         WHERE id = ?
     `;

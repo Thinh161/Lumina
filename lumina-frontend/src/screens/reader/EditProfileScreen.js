@@ -7,7 +7,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserProfile } from "../../redux_thunk/AuthSlice";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 const DEFAULT_AVATAR = "https://i.pravatar.cc/150?img=3";
 
 const EditProfileScreen = ({ navigation }) => {

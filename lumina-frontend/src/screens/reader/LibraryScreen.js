@@ -88,7 +88,7 @@ const LibraryScreen = ({ navigation }) => {
 					<Text style={styles.emptyDesc}>Thêm truyện bạn yêu thích vào đây để đọc sau.</Text>
 					<TouchableOpacity
 						style={styles.browseBtn}
-						onPress={() => navigation.navigate("Home")}
+						onPress={() => navigation.navigate("HomeTab")}
 					>
 						<Text style={styles.browseBtnText}>Khám phá truyện</Text>
 					</TouchableOpacity>

@@ -6,7 +6,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const ReadingHistoryScreen = ({ navigation }) => {
@@ -32,7 +32,7 @@ const ReadingHistoryScreen = ({ navigation }) => {
 			onPress={() => navigation.navigate("StoryDetail", { storyId: item.story_id })}
 			activeOpacity={0.75}
 		>
-			<Image source={{ uri: item.thumbnail || DEFAULT_COVER }} style={s.cover} />
+			<Image source={{ uri: item.cover_image || DEFAULT_COVER }} style={s.cover} />
 			<View style={s.info}>
 				<Text style={s.title} numberOfLines={2}>{item.story_title}</Text>
 				<Text style={s.meta}>{item.author_name}</Text>

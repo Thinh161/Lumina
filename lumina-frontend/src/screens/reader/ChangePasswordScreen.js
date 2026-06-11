@@ -6,7 +6,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 
 const ChangePasswordScreen = ({ navigation }) => {
 	const { user } = useSelector(state => state.auth);

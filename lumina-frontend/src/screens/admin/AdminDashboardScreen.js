@@ -5,11 +5,11 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const AdminDashboardScreen = ({ navigation }) => {
-	const [tab, setTab] = useState('pending');
+	const [tab, setTab] = useState('stories');
 	const [storyFilter, setStoryFilter] = useState('pending'); // pending | published | rejected
 	const [pendingStories, setPendingStories] = useState([]);
 	const [filteredStories, setFilteredStories] = useState([]);
@@ -42,6 +42,12 @@ const AdminDashboardScreen = ({ navigation }) => {
 	}, [tab, storyFilter]);
 
 	useEffect(() => { loadData(); }, [loadData]);
+
+	// Load author request count for badge on every mount
+	useEffect(() => {
+		fetch(`${API_URL}/admin/author-requests`).then(r => r.json())
+			.then(res => setAuthorRequests(res.data || [])).catch(() => {});
+	}, []);
 
 	const handleApprove = (storyId) => {
 		Alert.alert("Duyệt truyện", "Xác nhận duyệt truyện này?", [

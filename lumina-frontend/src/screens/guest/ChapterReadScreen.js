@@ -7,13 +7,14 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	ActivityIndicator,
-	Dimensions
+	Dimensions,
+	Alert
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchChapterContent, clearChapterContent } from "../../redux_thunk/StorySlice";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 
 const ChapterReadScreen = ({ navigation, route }) => {
 	const { chapterId, storyId } = route.params || {};
@@ -45,6 +46,16 @@ const ChapterReadScreen = ({ navigation, route }) => {
 			dispatch(clearChapterContent());
 		};
 	}, [dispatch, chapterId]);
+
+	useEffect(() => {
+		if (currentChapterContent?.is_vip && !user?.is_vip) {
+			Alert.alert(
+				"Nội dung VIP",
+				"Chương này dành riêng cho thành viên VIP. Hãy nâng cấp tài khoản để đọc.",
+				[{ text: "Quay lại", onPress: () => navigation.goBack() }]
+			);
+		}
+	}, [currentChapterContent, user, navigation]);
 
 	if (loading || !currentChapterContent) {
 		return (
@@ -136,7 +147,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 							<View style={styles.chapterFooter}>
 								<TouchableOpacity 
 									style={styles.nextChapterButton}
-									onPress={() => navigation.replace("ChapterRead", { chapterId: nextChapter.id, storyId })}
+									onPress={() => navigation.push("ChapterRead", { chapterId: nextChapter.id, storyId })}
 								>
 									<Text style={styles.nextLabel}>Chương kế tiếp</Text>
 									<Text style={styles.nextTitle}>Chương {nextChapter.chapter_number}: {nextChapter.title}</Text>

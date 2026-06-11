@@ -10,7 +10,7 @@ import { fetchLibrary } from "../../redux_thunk/LibrarySlice";
 
 const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg";
 
-const API_URL = 'http://192.168.10.104:5555/api';
+import { API_URL } from '../../config/api';
 
 const TOPUP_PACKAGES = [
 	{ label: "10.000đ", amount: 10 },
@@ -37,7 +37,8 @@ const ProfileScreen = ({ navigation }) => {
 		{ id: "m-1", title: "Thông tin cá nhân", subtitle: "Cập nhật tên và ảnh đại diện", icon: "person", screen: "EditProfile" },
 		{ id: "m-2", title: "Bảo mật & Mật khẩu", subtitle: "Đổi mật khẩu tài khoản", icon: "security", screen: "ChangePassword" },
 		{ id: "m-history", title: "Lịch sử đọc", subtitle: "Xem lại những chương đã đọc", icon: "history", screen: "ReadingHistory" },
-		...(isReader ? [{ id: "m-become-author", title: "Trở thành tác giả", subtitle: "Gửi yêu cầu lên Admin", icon: "create", action: "requestAuthor" }] : []),
+		...(isReader && !user?.author_request ? [{ id: "m-become-author", title: "Trở thành tác giả", subtitle: "Gửi yêu cầu lên Admin", icon: "create", action: "requestAuthor" }] : []),
+		...(isReader && user?.author_request ? [{ id: "m-pending-author", title: "Đang chờ duyệt", subtitle: "Yêu cầu tác giả đang được Admin xem xét", icon: "hourglass-empty", action: null }] : []),
 		...(isAuthor ? [{ id: "m-author", title: "Quản lý truyện", subtitle: "Đăng truyện mới, thêm chương", icon: "edit-note", screen: "AuthorDashboard" }] : []),
 		...(isAdmin ? [{ id: "m-admin", title: "Admin Dashboard", subtitle: "Kiểm duyệt truyện, quản lý user", icon: "admin-panel-settings", screen: "AdminDashboard" }] : []),
 	];
