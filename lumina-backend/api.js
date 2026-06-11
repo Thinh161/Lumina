@@ -32,6 +32,14 @@ con.connect(function (err) {
     con.query(`ALTER TABLE chapters ADD COLUMN unlock_at DATETIME NULL`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('unlock_at col:', e.message);
     });
+    // Thêm cột author_request vào users nếu chưa có
+    con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT(1) DEFAULT 0`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('author_request col:', e.message);
+    });
+    // Thêm cột rejection_reason vào stories nếu chưa có
+    con.query(`ALTER TABLE stories ADD COLUMN rejection_reason TEXT NULL`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('rejection_reason col:', e.message);
+    });
     con.query(`
         CREATE TABLE IF NOT EXISTS topup_requests (
             id INT AUTO_INCREMENT PRIMARY KEY,
