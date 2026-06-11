@@ -155,7 +155,9 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<View style={styles.metaPills}>
 								<View style={styles.metaPill}>
 									<MaterialIcons name="star" size={16} color="#8B4513" />
-									<Text style={styles.metaPillText}>4.9</Text>
+									<Text style={styles.metaPillText}>
+									{comments.length > 0 ? (comments.reduce((s, c) => s + (c.rating || 0), 0) / comments.filter(c => c.rating).length || 0).toFixed(1) : "—"}
+								</Text>
 								</View>
 								<View style={styles.metaPill}>
 									<MaterialIcons name="schedule" size={16} color="#8B4513" />
@@ -260,7 +262,13 @@ const StoryDetailScreen = ({ navigation, route }) => {
 												!chapter.is_vip && styles.chapterItemOpen,
 												chapter.is_vip && styles.chapterItemLocked,
 											]}
-											onPress={() => navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id })}
+											onPress={() => {
+											if (chapter.is_vip && !user?.is_vip) {
+												Alert.alert("Nội dung VIP", "Chương này dành riêng cho thành viên VIP. Hãy nâng cấp tài khoản để đọc.");
+												return;
+											}
+											navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id });
+										}}
 										>
 											<View style={{ flex: 1 }}>
 												<Text style={[styles.chapterMeta, !chapter.is_vip && styles.chapterMetaOpen]}>
@@ -271,7 +279,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 											{!chapter.is_vip ? (
 												<MaterialIcons name="lock-open" size={18} color="#8B4513" />
 											) : (
-												<MaterialIcons name="lock" size={18} color="#BBBBBB" />
+												<MaterialIcons name="lock" size={18} color={user?.is_vip ? "#8B4513" : "#BBBBBB"} />
 											)}
 										</TouchableOpacity>
 									))

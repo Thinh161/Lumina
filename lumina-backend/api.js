@@ -304,7 +304,8 @@ app.get('/api/author/stories/:userId', (req, res) => {
     const { userId } = req.params;
     const sql = `
         SELECT s.*, c.name as category_name,
-            (SELECT COUNT(*) FROM chapters ch WHERE ch.story_id = s.id) as chapter_count
+            (SELECT COUNT(*) FROM chapters ch WHERE ch.story_id = s.id) as chapter_count,
+            s.rejection_reason
         FROM stories s
         LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.author_id = ?
@@ -346,6 +347,71 @@ app.delete('/api/chapters/:id', (req, res) => {
     });
 });
 
+// 22.1. Sửa chương
+app.put('/api/chapters/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, content, is_vip } = req.body;
+    con.query(
+        `UPDATE chapters SET title = ?, content = ?, is_vip = ? WHERE id = ?`,
+        [title, content, is_vip ? 1 : 0, id],
+        (err) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success" });
+        }
+    );
+});
+
+// 20.1. Sửa thông tin truyện (tác giả)
+app.put('/api/stories/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, description, thumbnail, category_id } = req.body;
+    con.query(
+        `UPDATE stories SET title = ?, description = ?, thumbnail = ?, category_id = ?, updated_at = NOW() WHERE id = ?`,
+        [title, description, thumbnail, category_id, id],
+        (err) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success" });
+        }
+    );
+});
+
+// ========== LỊCH SỬ ĐỌC ==========
+
+// 27. Lịch sử đọc của user (từ bookmarks)
+app.get('/api/history/:userId', (req, res) => {
+    const { userId } = req.params;
+    const sql = `
+        SELECT b.id, b.chapter_id, b.scroll_position, b.updated_at,
+               c.chapter_number, c.title as chapter_title, c.story_id,
+               s.title as story_title, s.thumbnail as cover_image, s.author_id,
+               u.full_name as author_name
+        FROM bookmarks b
+        JOIN chapters c ON b.chapter_id = c.id
+        JOIN stories s ON c.story_id = s.id
+        LEFT JOIN users u ON s.author_id = u.id
+        WHERE b.user_id = ?
+        ORDER BY b.updated_at DESC
+        LIMIT 20
+    `;
+    con.query(sql, [userId], (err, results) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success", data: results });
+    });
+});
+
+// 28. Nạp xu
+app.put('/api/users/:id/balance', (req, res) => {
+    const { id } = req.params;
+    const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ status: "error", message: "Số xu không hợp lệ" });
+    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [amount, id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        con.query(`SELECT balance FROM users WHERE id = ?`, [id], (e2, r2) => {
+            res.json({ status: "success", balance: r2?.[0]?.balance });
+        });
+    });
+});
+
 // ========== ADMIN ==========
 
 // 23. Lấy truyện chờ duyệt
@@ -367,11 +433,15 @@ app.get('/api/admin/stories/pending', (req, res) => {
 // 24. Duyệt / từ chối truyện
 app.put('/api/admin/stories/:id/status', (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; // 'published' hoặc 'rejected'
-    con.query(`UPDATE stories SET status = ? WHERE id = ?`, [status, id], (err) => {
-        if (err) return res.status(500).json({ status: "error", message: err.message });
-        res.json({ status: "success" });
-    });
+    const { status, rejection_reason } = req.body;
+    con.query(
+        `UPDATE stories SET status = ?, rejection_reason = ? WHERE id = ?`,
+        [status, rejection_reason || null, id],
+        (err) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success" });
+        }
+    );
 });
 
 // 25. Lấy danh sách người dùng

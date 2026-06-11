@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
 	Text,
@@ -6,7 +6,8 @@ import {
 	SafeAreaView,
 	ScrollView,
 	TouchableOpacity,
-	ActivityIndicator
+	ActivityIndicator,
+	Dimensions
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -20,6 +21,9 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	const { currentChapterContent, currentStory, currentChapters, loading } = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
 	const scrollPositionRef = useRef(0);
+	const [progress, setProgress] = useState(0);
+	const contentHeightRef = useRef(0);
+	const screenHeight = Dimensions.get('window').height;
 
 	const saveBookmark = async (position) => {
 		if (!user || !chapterId) return;
@@ -83,8 +87,14 @@ const ChapterReadScreen = ({ navigation, route }) => {
 				<ScrollView
 					contentContainerStyle={styles.scrollContent}
 					showsVerticalScrollIndicator={false}
-					onScroll={e => { scrollPositionRef.current = e.nativeEvent.contentOffset.y; }}
-					scrollEventThrottle={500}
+					onContentSizeChange={(_, h) => { contentHeightRef.current = h; }}
+					onScroll={e => {
+						const offset = e.nativeEvent.contentOffset.y;
+						scrollPositionRef.current = offset;
+						const scrollable = contentHeightRef.current - screenHeight;
+						if (scrollable > 0) setProgress(Math.min(1, offset / scrollable));
+					}}
+					scrollEventThrottle={200}
 				>
 					<View style={styles.canvas}>
 						<View style={styles.chapterHeader}>
@@ -144,9 +154,9 @@ const ChapterReadScreen = ({ navigation, route }) => {
 				</ScrollView>
 
 				<View style={styles.progressBar}>
-					<Text style={styles.progressLabel}>45%</Text>
+					<Text style={styles.progressLabel}>{Math.round(progress * 100)}%</Text>
 					<View style={styles.progressTrack}>
-						<View style={styles.progressFill} />
+						<View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
 					</View>
 					<View style={styles.progressActions}>
 						<TouchableOpacity>
@@ -408,7 +418,6 @@ const styles = StyleSheet.create({
 		overflow: "hidden",
 	},
 	progressFill: {
-		width: "45%",
 		height: "100%",
 		backgroundColor: "#8B4513",
 	},

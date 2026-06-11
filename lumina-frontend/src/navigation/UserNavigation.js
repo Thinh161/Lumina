@@ -14,6 +14,7 @@ import AddChapterScreen from "../screens/author/AddChapterScreen";
 import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
 import SearchScreen from "../screens/guest/SearchScreen";
 import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
+import ReadingHistoryScreen from "../screens/reader/ReadingHistoryScreen";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -51,6 +52,7 @@ const ProfileStackScreen = () => (
     <ProfileStack.Screen name="AddChapter" component={AddChapterScreen} />
     <ProfileStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     <ProfileStack.Screen name="StoryDetail" component={StoryDetailScreen} />
+    <ProfileStack.Screen name="ReadingHistory" component={ReadingHistoryScreen} />
   </ProfileStack.Navigator>
 );
 

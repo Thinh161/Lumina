@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View, Text, StyleSheet, SafeAreaView, ScrollView,
-	Image, TouchableOpacity, Alert,
+	Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -9,6 +9,15 @@ import { fetchUserProfile, logout } from "../../redux_thunk/AuthSlice";
 import { fetchLibrary } from "../../redux_thunk/LibrarySlice";
 
 const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg";
+
+const API_URL = 'http://192.168.10.104:5555/api';
+
+const TOPUP_PACKAGES = [
+	{ label: "10.000đ", amount: 10 },
+	{ label: "50.000đ", amount: 50 },
+	{ label: "100.000đ", amount: 100 },
+	{ label: "200.000đ", amount: 200 },
+];
 
 const ProfileScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
@@ -18,9 +27,14 @@ const ProfileScreen = ({ navigation }) => {
 	const isAuthor = user?.role_id === 2;
 	const isAdmin = user?.role_id === 1;
 
+	const [showTopup, setShowTopup] = useState(false);
+	const [topupAmount, setTopupAmount] = useState('');
+	const [topupLoading, setTopupLoading] = useState(false);
+
 	const managementItems = [
 		{ id: "m-1", title: "Thông tin cá nhân", subtitle: "Cập nhật tên và ảnh đại diện", icon: "person", screen: "EditProfile" },
 		{ id: "m-2", title: "Bảo mật & Mật khẩu", subtitle: "Đổi mật khẩu tài khoản", icon: "security", screen: "ChangePassword" },
+		{ id: "m-history", title: "Lịch sử đọc", subtitle: "Xem lại những chương đã đọc", icon: "history", screen: "ReadingHistory" },
 		...(isAuthor ? [{ id: "m-author", title: "Quản lý truyện", subtitle: "Đăng truyện mới, thêm chương", icon: "edit-note", screen: "AuthorDashboard" }] : []),
 		...(isAdmin ? [{ id: "m-admin", title: "Admin Dashboard", subtitle: "Kiểm duyệt truyện, quản lý user", icon: "admin-panel-settings", screen: "AdminDashboard" }] : []),
 	];
@@ -43,6 +57,28 @@ const ProfileScreen = ({ navigation }) => {
 			return;
 		}
 		Alert.alert("Đăng xuất", "Bạn đã đăng xuất.");
+	};
+
+	const handleTopup = async () => {
+		const amount = parseInt(topupAmount, 10);
+		if (!amount || amount <= 0) { Alert.alert("Lỗi", "Vui lòng nhập số xu hợp lệ."); return; }
+		setTopupLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/users/${user.id}/balance`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ amount }),
+			}).then(r => r.json());
+			if (res.status === 'success') {
+				dispatch(fetchUserProfile(user.id));
+				setShowTopup(false);
+				setTopupAmount('');
+				Alert.alert("Nạp xu thành công", `Số dư mới: ${Number(res.balance).toLocaleString("vi-VN")} xu`);
+			} else {
+				Alert.alert("Lỗi", res.message || "Nạp xu thất bại.");
+			}
+		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+		finally { setTopupLoading(false); }
 	};
 
 	const displayName = user?.full_name || user?.username || "Độc giả";
@@ -99,7 +135,7 @@ const ProfileScreen = ({ navigation }) => {
 								</View>
 								<Text style={styles.vipSubtitle}>Xu hiện có trong tài khoản của bạn</Text>
 							</View>
-							<TouchableOpacity style={styles.vipButton}>
+							<TouchableOpacity style={styles.vipButton} onPress={() => setShowTopup(true)}>
 								<Text style={styles.vipButtonText}>Nạp Xu Ngay</Text>
 								<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
 							</TouchableOpacity>
@@ -166,6 +202,43 @@ const ProfileScreen = ({ navigation }) => {
 					</View>
 				</ScrollView>
 			</View>
+
+			{/* Modal Nạp Xu */}
+			<Modal visible={showTopup} animationType="slide" transparent>
+				<View style={styles.overlay}>
+					<View style={styles.sheet}>
+						<View style={styles.sheetHeader}>
+							<Text style={styles.sheetTitle}>Nạp Xu</Text>
+							<TouchableOpacity onPress={() => { setShowTopup(false); setTopupAmount(''); }}>
+								<MaterialIcons name="close" size={22} color="#888888" />
+							</TouchableOpacity>
+						</View>
+						<Text style={styles.sheetSub}>Chọn gói hoặc nhập số xu muốn nạp</Text>
+						<View style={styles.packageRow}>
+							{TOPUP_PACKAGES.map(p => (
+								<TouchableOpacity
+									key={p.amount}
+									style={[styles.packageBtn, topupAmount === String(p.amount) && styles.packageBtnActive]}
+									onPress={() => setTopupAmount(String(p.amount))}
+								>
+									<Text style={[styles.packageBtnText, topupAmount === String(p.amount) && styles.packageBtnTextActive]}>{p.label}</Text>
+								</TouchableOpacity>
+							))}
+						</View>
+						<TextInput
+							style={styles.topupInput}
+							value={topupAmount}
+							onChangeText={setTopupAmount}
+							placeholder="Hoặc nhập số xu..."
+							placeholderTextColor="#BBBBBB"
+							keyboardType="numeric"
+						/>
+						<TouchableOpacity style={[styles.topupSubmitBtn, topupLoading && { opacity: 0.6 }]} onPress={handleTopup} disabled={topupLoading}>
+							{topupLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.topupSubmitText}>Xác nhận nạp xu</Text>}
+						</TouchableOpacity>
+					</View>
+				</View>
+			</Modal>
 		</SafeAreaView>
 	);
 };
@@ -217,6 +290,19 @@ const styles = StyleSheet.create({
 	managementItemSubtitle: { fontSize: 10, color: "#888888", marginTop: 2 },
 	logoutRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12 },
 	logoutText: { fontSize: 13, fontWeight: "700", color: "#D32F2F" },
+	overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+	sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
+	sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+	sheetTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A1A" },
+	sheetSub: { fontSize: 13, color: "#888888" },
+	packageRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+	packageBtn: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
+	packageBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
+	packageBtnText: { fontSize: 13, fontWeight: "700", color: "#888888" },
+	packageBtnTextActive: { color: "#FFFFFF" },
+	topupInput: { backgroundColor: "#F5F5F5", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: "#1A1A1A" },
+	topupSubmitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center" },
+	topupSubmitText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
 
 export default ProfileScreen;
