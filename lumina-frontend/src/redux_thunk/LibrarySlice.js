@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
-const API_URL = 'http://10.106.42.58:5555/api';
+const API_URL = 'http://192.168.10.104:5555/api';
 
 export const fetchLibrary = createAsyncThunk("library/fetchLibrary",
 	async (userId, { rejectWithValue }) => {

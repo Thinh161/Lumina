@@ -6,7 +6,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 
-const API_URL = 'http://10.106.42.58:5555/api';
+const API_URL = 'http://192.168.10.104:5555/api';
 const STATUS_COLOR = { published: "#2e7d32", pending: "#e65100", rejected: "#c62828" };
 const STATUS_LABEL = { published: "Đã duyệt", pending: "Chờ duyệt", rejected: "Bị từ chối" };
 

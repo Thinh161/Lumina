@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const API_URL = 'http://10.106.42.58:5555/api';
+const API_URL = 'http://192.168.10.104:5555/api';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const AdminDashboardScreen = () => {
