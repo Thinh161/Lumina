@@ -13,18 +13,33 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchChapterContent, clearChapterContent } from "../../redux_thunk/StorySlice";
-
 import { API_URL } from '../../config/api';
+
+const FONT_SIZES = [14, 16, 18, 20];
+const THEMES = {
+	light: { bg: '#FFFFFF', text: '#1A1A1A', sub: '#888888', progressBg: 'rgba(255,255,255,0.95)' },
+	sepia: { bg: '#F5E6C8', text: '#3B2A1A', sub: '#7A5C3A', progressBg: 'rgba(245,230,200,0.95)' },
+	dark:  { bg: '#1A1A1A', text: '#E8E0D5', sub: '#AAAAAA', progressBg: 'rgba(26,26,26,0.95)' },
+};
 
 const ChapterReadScreen = ({ navigation, route }) => {
 	const { chapterId, storyId } = route.params || {};
 	const dispatch = useDispatch();
-	const { currentChapterContent, currentStory, currentChapters, loading } = useSelector(state => state.story);
+	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked } = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
 	const scrollPositionRef = useRef(0);
 	const [progress, setProgress] = useState(0);
 	const contentHeightRef = useRef(0);
 	const screenHeight = Dimensions.get('window').height;
+
+	const [fontSize, setFontSize] = useState(16);
+	const [bgMode, setBgMode] = useState('light');
+	const theme = THEMES[bgMode];
+
+	const cycleFontSize = () => {
+		const idx = FONT_SIZES.indexOf(fontSize);
+		setFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.length]);
+	};
 
 	const saveBookmark = async (position) => {
 		if (!user || !chapterId) return;
@@ -39,7 +54,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 
 	useEffect(() => {
 		if (chapterId) {
-			dispatch(fetchChapterContent(chapterId));
+			dispatch(fetchChapterContent({ chapterId, userId: user?.id }));
 		}
 		return () => {
 			saveBookmark(scrollPositionRef.current);
@@ -48,49 +63,57 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	}, [dispatch, chapterId]);
 
 	useEffect(() => {
-		if (currentChapterContent?.is_vip && !user?.is_vip) {
+		if (vipBlocked) {
 			Alert.alert(
 				"Nội dung VIP",
 				"Chương này dành riêng cho thành viên VIP. Hãy nâng cấp tài khoản để đọc.",
 				[{ text: "Quay lại", onPress: () => navigation.goBack() }]
 			);
 		}
-	}, [currentChapterContent, user, navigation]);
+	}, [vipBlocked, navigation]);
 
-	if (loading || !currentChapterContent) {
+	if (loading || (!currentChapterContent && !vipBlocked)) {
 		return (
-			<SafeAreaView style={[styles.safeArea, { justifyContent: "center", alignItems: "center" }]}>
+			<SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg, justifyContent: "center", alignItems: "center" }]}>
 				<ActivityIndicator size="large" color="#8B4513" />
 			</SafeAreaView>
 		);
 	}
 
-	// Tìm chương kế tiếp
+	if (vipBlocked || !currentChapterContent) return null;
+
 	const currentIndex = currentChapters?.findIndex(c => c.id === chapterId);
-	const nextChapter = (currentIndex !== -1 && currentIndex < currentChapters.length - 1) 
-		? currentChapters[currentIndex + 1] 
+	const nextChapter = (currentIndex !== -1 && currentIndex < currentChapters.length - 1)
+		? currentChapters[currentIndex + 1]
 		: null;
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
+		<SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
 			<View style={styles.root}>
 				<View style={styles.topBar}>
-					<TouchableOpacity
-						style={styles.iconButton}
-						onPress={() => navigation.goBack()}
-					>
+					<TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
 						<MaterialIcons name="arrow-back" size={20} color="#888888" />
 					</TouchableOpacity>
 
 					<View style={styles.toolbarGroup}>
-						<TouchableOpacity style={styles.toolbarIcon}>
+						<TouchableOpacity style={styles.toolbarIcon} onPress={cycleFontSize}>
 							<MaterialIcons name="format-size" size={18} color="#888888" />
+							<Text style={styles.fontSizeLabel}>{fontSize}</Text>
 						</TouchableOpacity>
 						<View style={styles.toolbarDivider} />
 						<View style={styles.paletteRow}>
-							<View style={[styles.paletteDot, styles.paletteLight]} />
-							<View style={[styles.paletteDot, styles.paletteSepia]} />
-							<View style={[styles.paletteDot, styles.paletteDark]} />
+							<TouchableOpacity
+								style={[styles.paletteDot, styles.paletteLight, bgMode === 'light' && styles.paletteDotActive]}
+								onPress={() => setBgMode('light')}
+							/>
+							<TouchableOpacity
+								style={[styles.paletteDot, styles.paletteSepia, bgMode === 'sepia' && styles.paletteDotActive]}
+								onPress={() => setBgMode('sepia')}
+							/>
+							<TouchableOpacity
+								style={[styles.paletteDot, styles.paletteDark, bgMode === 'dark' && styles.paletteDotActive]}
+								onPress={() => setBgMode('dark')}
+							/>
 						</View>
 					</View>
 				</View>
@@ -109,54 +132,49 @@ const ChapterReadScreen = ({ navigation, route }) => {
 				>
 					<View style={styles.canvas}>
 						<View style={styles.chapterHeader}>
-							<Text style={styles.chapterMeta}>Chương {currentChapterContent.chapter_number}</Text>
-							<Text style={styles.chapterTitle}>
+							<Text style={[styles.chapterMeta, { color: '#8B4513' }]}>Chương {currentChapterContent.chapter_number}</Text>
+							<Text style={[styles.chapterTitle, { color: theme.text, fontSize: fontSize + 12 }]}>
 								{currentChapterContent.title}
 							</Text>
 							<View style={styles.chapterStats}>
-								<Text style={styles.chapterStat}>{currentStory?.title || "Đang đọc"}</Text>
+								<Text style={[styles.chapterStat, { color: theme.sub }]}>{currentStory?.title || "Đang đọc"}</Text>
 							</View>
 						</View>
 
 						<View style={styles.article}>
-							{/* Tách nội dung chương theo từng đoạn */}
 							{currentChapterContent.content ? (
 								currentChapterContent.content.split('\n').filter(p => p.trim() !== '').map((para, index) => {
 									if (index === 0) {
 										return (
 											<View key={index} style={styles.dropCapRow}>
-												<Text style={styles.dropCap}>{para.charAt(0)}</Text>
-												<Text style={styles.paragraphFirst}>
+												<Text style={[styles.dropCap, { fontSize: fontSize + 30, lineHeight: fontSize + 36 }]}>{para.charAt(0)}</Text>
+												<Text style={[styles.paragraphFirst, { fontSize, color: theme.text }]}>
 													{para.substring(1)}
 												</Text>
 											</View>
 										);
 									}
 									return (
-										<Text key={index} style={styles.paragraph}>
+										<Text key={index} style={[styles.paragraph, { fontSize, color: theme.text, lineHeight: fontSize * 1.7 }]}>
 											{para}
 										</Text>
 									);
 								})
 							) : (
-								<Text style={styles.paragraph}>Chương này chưa có nội dung.</Text>
+								<Text style={[styles.paragraph, { fontSize, color: theme.text }]}>Chương này chưa có nội dung.</Text>
 							)}
 						</View>
 
 						{nextChapter && (
 							<View style={styles.chapterFooter}>
-								<TouchableOpacity 
+								<TouchableOpacity
 									style={styles.nextChapterButton}
 									onPress={() => navigation.push("ChapterRead", { chapterId: nextChapter.id, storyId })}
 								>
-									<Text style={styles.nextLabel}>Chương kế tiếp</Text>
-									<Text style={styles.nextTitle}>Chương {nextChapter.chapter_number}: {nextChapter.title}</Text>
-									<View style={styles.nextIconWrap}>
-										<MaterialIcons
-											name="keyboard-arrow-down"
-											size={24}
-											color="#8B4513"
-										/>
+									<Text style={[styles.nextLabel, { color: theme.sub }]}>Chương kế tiếp</Text>
+									<Text style={[styles.nextTitle, { color: theme.text }]}>Chương {nextChapter.chapter_number}: {nextChapter.title}</Text>
+									<View style={[styles.nextIconWrap, { borderColor: bgMode === 'dark' ? '#333333' : '#EBEBEB' }]}>
+										<MaterialIcons name="keyboard-arrow-down" size={24} color="#8B4513" />
 									</View>
 								</TouchableOpacity>
 							</View>
@@ -164,8 +182,8 @@ const ChapterReadScreen = ({ navigation, route }) => {
 					</View>
 				</ScrollView>
 
-				<View style={styles.progressBar}>
-					<Text style={styles.progressLabel}>{Math.round(progress * 100)}%</Text>
+				<View style={[styles.progressBar, { backgroundColor: theme.progressBg }]}>
+					<Text style={[styles.progressLabel, { color: theme.sub }]}>{Math.round(progress * 100)}%</Text>
 					<View style={styles.progressTrack}>
 						<View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
 					</View>
@@ -184,259 +202,62 @@ const ChapterReadScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: "#FFFFFF",
-	},
-	root: {
-		flex: 1,
-	},
+	safeArea: { flex: 1 },
+	root: { flex: 1 },
 	topBar: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		zIndex: 10,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingTop: 8,
-		paddingBottom: 8,
+		position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+		flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+		paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8,
 	},
 	iconButton: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
+		width: 40, height: 40, borderRadius: 20,
 		backgroundColor: "rgba(245, 245, 245, 0.95)",
-		alignItems: "center",
-		justifyContent: "center",
+		alignItems: "center", justifyContent: "center",
 	},
 	toolbarGroup: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 999,
-		backgroundColor: "rgba(245, 245, 245, 0.95)",
+		flexDirection: "row", alignItems: "center",
+		paddingHorizontal: 12, paddingVertical: 6,
+		borderRadius: 999, backgroundColor: "rgba(245, 245, 245, 0.95)",
 	},
-	toolbarIcon: {
-		padding: 4,
-	},
-	toolbarDivider: {
-		width: 1,
-		height: 16,
-		backgroundColor: "#EBEBEB",
-		marginHorizontal: 8,
-	},
-	paletteRow: {
-		flexDirection: "row",
-		gap: 6,
-	},
-	paletteDot: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		borderWidth: 1,
-		borderColor: "#EBEBEB",
-	},
-	paletteLight: {
-		backgroundColor: "#F5F5F5",
-	},
-	paletteSepia: {
-		backgroundColor: "#F5E6C8",
-	},
-	paletteDark: {
-		backgroundColor: "#1A1A1A",
-	},
-	scrollContent: {
-		paddingTop: 72,
-		paddingBottom: 120,
-	},
-	canvas: {
-		width: "100%",
-		maxWidth: 720,
-		alignSelf: "center",
-		paddingHorizontal: 20,
-	},
-	chapterHeader: {
-		alignItems: "center",
-		marginBottom: 24,
-	},
-	chapterMeta: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 3,
-		textTransform: "uppercase",
-		color: "#8B4513",
-		marginBottom: 12,
-	},
-	chapterTitle: {
-		fontSize: 28,
-		fontWeight: "700",
-		fontStyle: "italic",
-		textAlign: "center",
-		color: "#1A1A1A",
-		marginBottom: 12,
-	},
-	chapterStats: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-	},
-	chapterStat: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-		color: "#888888",
-	},
-	dot: {
-		width: 4,
-		height: 4,
-		borderRadius: 2,
-		backgroundColor: "#EBEBEB",
-	},
-	heroImageWrap: {
-		borderRadius: 16,
-		overflow: "hidden",
-		marginBottom: 24,
-		backgroundColor: "#F5F5F5",
-	},
-	heroImage: {
-		width: "100%",
-		height: 200,
-	},
-	heroOverlay: {
-		position: "absolute",
-		left: 0,
-		right: 0,
-		top: 0,
-		bottom: 0,
-		backgroundColor: "rgba(255, 255, 255, 0.05)",
-	},
-	article: {
-		gap: 18,
-	},
-	dropCapRow: {
-		flexDirection: "row",
-		gap: 8,
-	},
-	dropCap: {
-		fontSize: 46,
-		fontWeight: "700",
-		color: "#8B4513",
-		lineHeight: 52,
-	},
-	paragraphFirst: {
-		flex: 1,
-		fontSize: 16,
-		lineHeight: 26,
-		color: "#1A1A1A",
-	},
-	paragraph: {
-		fontSize: 16,
-		lineHeight: 26,
-		color: "#1A1A1A",
-	},
-	quoteBlock: {
-		padding: 16,
-		borderLeftWidth: 2,
-		borderLeftColor: "rgba(139, 69, 19, 0.2)",
-		backgroundColor: "#F5F5F5",
-		borderRadius: 12,
-	},
-	quoteText: {
-		fontSize: 18,
-		fontStyle: "italic",
-		color: "#888888",
-		lineHeight: 26,
-	},
-	splitRow: {
-		gap: 16,
-	},
-	splitText: {
-		flex: 1,
-	},
-	splitImageWrap: {
-		alignSelf: "center",
-		width: "70%",
-		borderRadius: 16,
-		overflow: "hidden",
-	},
-	splitImage: {
-		width: "100%",
-		height: 220,
-	},
-	chapterFooter: {
-		marginTop: 24,
-		alignItems: "center",
-	},
-	nextChapterButton: {
-		alignItems: "center",
-		gap: 8,
-	},
-	nextLabel: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-		color: "#888888",
-	},
-	nextTitle: {
-		fontSize: 20,
-		fontWeight: "700",
-		fontStyle: "italic",
-		color: "#1A1A1A",
-		textAlign: "center",
-	},
+	toolbarIcon: { flexDirection: "row", alignItems: "center", gap: 3, padding: 4 },
+	fontSizeLabel: { fontSize: 10, fontWeight: "700", color: "#888888" },
+	toolbarDivider: { width: 1, height: 16, backgroundColor: "#EBEBEB", marginHorizontal: 8 },
+	paletteRow: { flexDirection: "row", gap: 6 },
+	paletteDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: "#EBEBEB" },
+	paletteDotActive: { borderWidth: 2, borderColor: "#8B4513" },
+	paletteLight: { backgroundColor: "#F5F5F5" },
+	paletteSepia: { backgroundColor: "#F5E6C8" },
+	paletteDark: { backgroundColor: "#1A1A1A" },
+	scrollContent: { paddingTop: 72, paddingBottom: 120 },
+	canvas: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 20 },
+	chapterHeader: { alignItems: "center", marginBottom: 24 },
+	chapterMeta: { fontSize: 10, fontWeight: "700", letterSpacing: 3, textTransform: "uppercase", marginBottom: 12 },
+	chapterTitle: { fontWeight: "700", fontStyle: "italic", textAlign: "center", marginBottom: 12 },
+	chapterStats: { flexDirection: "row", alignItems: "center", gap: 10 },
+	chapterStat: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase" },
+	article: { gap: 18 },
+	dropCapRow: { flexDirection: "row", gap: 8 },
+	dropCap: { fontWeight: "700", color: "#8B4513" },
+	paragraphFirst: { flex: 1, lineHeight: 26 },
+	paragraph: {},
+	chapterFooter: { marginTop: 24, alignItems: "center" },
+	nextChapterButton: { alignItems: "center", gap: 8 },
+	nextLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase" },
+	nextTitle: { fontSize: 20, fontWeight: "700", fontStyle: "italic", textAlign: "center" },
 	nextIconWrap: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		borderWidth: 1,
-		borderColor: "#EBEBEB",
-		alignItems: "center",
-		justifyContent: "center",
-		marginTop: 4,
+		width: 44, height: 44, borderRadius: 22, borderWidth: 1,
+		alignItems: "center", justifyContent: "center", marginTop: 4,
 	},
 	progressBar: {
-		position: "absolute",
-		left: 16,
-		right: 16,
-		bottom: 16,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 12,
-		backgroundColor: "rgba(255, 255, 255, 0.95)",
-		borderRadius: 999,
-		paddingVertical: 10,
-		paddingHorizontal: 14,
-		borderWidth: 1,
-		borderColor: "#EBEBEB",
+		position: "absolute", left: 16, right: 16, bottom: 16,
+		flexDirection: "row", alignItems: "center", gap: 12,
+		borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14,
+		borderWidth: 1, borderColor: "#EBEBEB",
 	},
-	progressLabel: {
-		fontSize: 10,
-		fontWeight: "700",
-		color: "#888888",
-		width: 36,
-	},
-	progressTrack: {
-		flex: 1,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: "#EBEBEB",
-		overflow: "hidden",
-	},
-	progressFill: {
-		height: "100%",
-		backgroundColor: "#8B4513",
-	},
-	progressActions: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-	},
+	progressLabel: { fontSize: 10, fontWeight: "700", width: 36 },
+	progressTrack: { flex: 1, height: 4, borderRadius: 999, backgroundColor: "#EBEBEB", overflow: "hidden" },
+	progressFill: { height: "100%", backgroundColor: "#8B4513" },
+	progressActions: { flexDirection: "row", alignItems: "center", gap: 10 },
 });
 
 export default ChapterReadScreen;

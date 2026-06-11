@@ -178,17 +178,24 @@ app.get('/api/stories/:storyId/chapters', (req, res) => {
     });
 });
 
-// 7. Lấy nội dung chi tiết của một chương
+// 7. Lấy nội dung chi tiết của một chương (VIP enforcement)
 app.get('/api/chapters/:id', (req, res) => {
     const { id } = req.params;
-    const sql = `SELECT * FROM chapters WHERE id = ?`;
-    con.query(sql, [id], (err, results) => {
+    const { user_id } = req.query;
+    con.query(`SELECT * FROM chapters WHERE id = ?`, [id], (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
-        if (results.length > 0) {
-            res.json({ status: "success", data: results[0] });
-        } else {
-            res.status(404).json({ status: "error", message: "Không tìm thấy chương" });
-        }
+        if (results.length === 0) return res.status(404).json({ status: "error", message: "Không tìm thấy chương" });
+        const chapter = results[0];
+        if (!chapter.is_vip) return res.json({ status: "success", data: chapter });
+        if (!user_id) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+        con.query(`SELECT is_vip, role_id FROM users WHERE id = ?`, [user_id], (err2, users) => {
+            if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+            const u = users[0];
+            // VIP users, Authors (role_id=2), Admins (role_id=1) đều được đọc
+            if (!u.is_vip && u.role_id !== 1 && u.role_id !== 2)
+                return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: "Chương này dành riêng cho thành viên VIP." });
+            res.json({ status: "success", data: chapter });
+        });
     });
 });
 
@@ -256,6 +263,21 @@ app.post('/api/comments', (req, res) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success", id: result.insertId });
     });
+});
+
+// 13.1. Sửa bình luận (chỉ của chính mình)
+app.put('/api/comments/:id/:userId', (req, res) => {
+    const { id, userId } = req.params;
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ status: "error", message: "Nội dung không được trống." });
+    con.query(`UPDATE comments_reviews SET content = ? WHERE id = ? AND user_id = ?`,
+        [content.trim(), id, userId],
+        (err, result) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            if (result.affectedRows === 0) return res.status(403).json({ status: "error", message: "Không có quyền sửa." });
+            res.json({ status: "success" });
+        }
+    );
 });
 
 // 14. Xóa bình luận (chỉ của chính mình)
@@ -512,6 +534,15 @@ app.put('/api/admin/users/:id/reject-author', (req, res) => {
 app.put('/api/admin/users/:id/vip', (req, res) => {
     const { id } = req.params;
     con.query(`UPDATE users SET is_vip = 1 WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ status: "error", message: err.message });
+        res.json({ status: "success" });
+    });
+});
+
+// Admin: Thu hồi VIP
+app.put('/api/admin/users/:id/revoke-vip', (req, res) => {
+    const { id } = req.params;
+    con.query(`UPDATE users SET is_vip = 0 WHERE id = ?`, [id], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success" });
     });

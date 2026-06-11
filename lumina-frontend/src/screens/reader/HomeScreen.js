@@ -10,6 +10,8 @@ import { fetchStories, fetchCategories, fetchStoryDetails, fetchChapters } from 
 import { API_URL } from '../../config/api';
 const DEFAULT_IMG = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
+const PAGE_SIZE = 10;
+
 const HomeScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
 	const { stories, categories, loading } = useSelector(s => s.story);
@@ -18,6 +20,8 @@ const HomeScreen = ({ navigation }) => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [latest, setLatest] = useState([]);
 	const [top, setTop] = useState([]);
+	const [continueReading, setContinueReading] = useState(null);
+	const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
 	const loadSections = useCallback(async () => {
 		try {
@@ -30,19 +34,29 @@ const HomeScreen = ({ navigation }) => {
 		} catch {}
 	}, []);
 
+	const loadContinueReading = useCallback(async () => {
+		if (!user?.id) return;
+		try {
+			const res = await fetch(`${API_URL}/history/${user.id}`).then(r => r.json());
+			if (res.data && res.data.length > 0) setContinueReading(res.data[0]);
+		} catch {}
+	}, [user]);
+
 	const loadData = useCallback(() => {
 		dispatch(fetchStories());
 		dispatch(fetchCategories());
 		loadSections();
-	}, [dispatch, loadSections]);
+		loadContinueReading();
+	}, [dispatch, loadSections, loadContinueReading]);
 
 	useEffect(() => { loadData(); }, [loadData]);
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
-		await Promise.all([dispatch(fetchStories()), dispatch(fetchCategories()), loadSections()]);
+		setDisplayCount(PAGE_SIZE);
+		await Promise.all([dispatch(fetchStories()), dispatch(fetchCategories()), loadSections(), loadContinueReading()]);
 		setRefreshing(false);
-	}, [dispatch, loadSections]);
+	}, [dispatch, loadSections, loadContinueReading]);
 
 	const handleReadNow = async (storyId) => {
 		try {
@@ -57,6 +71,8 @@ const HomeScreen = ({ navigation }) => {
 	};
 
 	const filtered = selectedCat ? stories.filter(s => s.category_id === selectedCat) : stories;
+	const displayed = filtered.slice(0, displayCount);
+	const hasMore = displayCount < filtered.length;
 
 	if (loading && stories.length === 0) {
 		return <SafeAreaView style={s.safe}><ActivityIndicator size="large" color="#8B4513" style={{ flex: 1 }} /></SafeAreaView>;
@@ -74,15 +90,36 @@ const HomeScreen = ({ navigation }) => {
 				</TouchableOpacity>
 			</View>
 
-			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}
-			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
-		>
+			<ScrollView
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={s.scroll}
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
+			>
+				{/* Tiếp tục đọc */}
+				{continueReading && (
+					<TouchableOpacity
+						style={s.continueCard}
+						onPress={() => navigation.navigate("ChapterRead", { chapterId: continueReading.chapter_id, storyId: continueReading.story_id })}
+						activeOpacity={0.85}
+					>
+						<Image source={{ uri: continueReading.cover_image || DEFAULT_IMG }} style={s.continueCover} />
+						<View style={s.continueInfo}>
+							<Text style={s.continueMeta}>TIẾP TỤC ĐỌC</Text>
+							<Text style={s.continueTitle} numberOfLines={1}>{continueReading.story_title}</Text>
+							<Text style={s.continueChap} numberOfLines={1}>
+								Chương {continueReading.chapter_number}: {continueReading.chapter_title}
+							</Text>
+						</View>
+						<MaterialIcons name="play-circle-filled" size={32} color="#8B4513" />
+					</TouchableOpacity>
+				)}
+
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
-					<TouchableOpacity style={[s.chip, !selectedCat && s.chipActive]} onPress={() => setSelectedCat(null)}>
+					<TouchableOpacity style={[s.chip, !selectedCat && s.chipActive]} onPress={() => { setSelectedCat(null); setDisplayCount(PAGE_SIZE); }}>
 						<Text style={[s.chipText, !selectedCat && s.chipTextActive]}>Tất cả</Text>
 					</TouchableOpacity>
 					{categories.map(c => (
-						<TouchableOpacity key={c.id} style={[s.chip, selectedCat === c.id && s.chipActive]} onPress={() => setSelectedCat(selectedCat === c.id ? null : c.id)}>
+						<TouchableOpacity key={c.id} style={[s.chip, selectedCat === c.id && s.chipActive]} onPress={() => { setSelectedCat(selectedCat === c.id ? null : c.id); setDisplayCount(PAGE_SIZE); }}>
 							<Text style={[s.chipText, selectedCat === c.id && s.chipTextActive]}>{c.name}</Text>
 						</TouchableOpacity>
 					))}
@@ -103,42 +140,42 @@ const HomeScreen = ({ navigation }) => {
 					</TouchableOpacity>
 				)}
 
-			{latest.length > 0 && (
-				<>
-					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-						{latest.map(story => (
-							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
-								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
-								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
-								<Text style={s.hAuthor} numberOfLines={1}>{story.author_name}</Text>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
-				</>
-			)}
+				{latest.length > 0 && (
+					<>
+						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+							{latest.map(story => (
+								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+									<Text style={s.hAuthor} numberOfLines={1}>{story.author_name}</Text>
+								</TouchableOpacity>
+							))}
+						</ScrollView>
+					</>
+				)}
 
-			{top.length > 0 && (
-				<>
-					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-						{top.map(story => (
-							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
-								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
-								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
-								<View style={s.hViews}><MaterialIcons name="visibility" size={10} color="#8B4513" /><Text style={s.hViewText}>{story.views || 0}</Text></View>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
-				</>
-			)}
+				{top.length > 0 && (
+					<>
+						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+							{top.map(story => (
+								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+									<View style={s.hViews}><MaterialIcons name="visibility" size={10} color="#8B4513" /><Text style={s.hViewText}>{story.views || 0}</Text></View>
+								</TouchableOpacity>
+							))}
+						</ScrollView>
+					</>
+				)}
 
 				<View style={s.sectionHeader}>
 					<Text style={s.sectionTitle}>Tất cả truyện</Text>
 					<Text style={s.sectionCount}>{filtered.length} truyện</Text>
 				</View>
 
-				{filtered.map(story => (
+				{displayed.map(story => (
 					<TouchableOpacity key={story.id} style={s.card} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
 						<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.cardImg} />
 						<View style={s.cardInfo}>
@@ -152,6 +189,13 @@ const HomeScreen = ({ navigation }) => {
 						</View>
 					</TouchableOpacity>
 				))}
+
+				{hasMore && (
+					<TouchableOpacity style={s.loadMoreBtn} onPress={() => setDisplayCount(prev => prev + PAGE_SIZE)}>
+						<Text style={s.loadMoreText}>Xem thêm ({filtered.length - displayCount} truyện)</Text>
+						<MaterialIcons name="expand-more" size={18} color="#8B4513" />
+					</TouchableOpacity>
+				)}
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -164,6 +208,12 @@ const s = StyleSheet.create({
 	sub: { fontSize: 12, color: '#888888', marginTop: 1 },
 	searchBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
 	scroll: { paddingBottom: 24 },
+	continueCard: { marginHorizontal: 16, marginTop: 14, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F2E8E3', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#EBEBEB' },
+	continueCover: { width: 50, height: 70, borderRadius: 8 },
+	continueInfo: { flex: 1 },
+	continueMeta: { fontSize: 9, fontWeight: '700', letterSpacing: 2, color: '#8B4513', textTransform: 'uppercase' },
+	continueTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginTop: 3 },
+	continueChap: { fontSize: 12, color: '#888888', marginTop: 2 },
 	chips: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
 	chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: '#F5F5F5' },
 	chipActive: { backgroundColor: '#8B4513' },
@@ -191,6 +241,8 @@ const s = StyleSheet.create({
 	catPillText: { fontSize: 10, color: '#8B4513', fontWeight: '600' },
 	views: { fontSize: 11, color: '#BBBBBB' },
 	cardDesc: { fontSize: 11, color: '#888888', lineHeight: 16, marginTop: 4 },
+	loadMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginHorizontal: 16, marginTop: 8, marginBottom: 8, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#EBEBEB', backgroundColor: '#F5F5F5' },
+	loadMoreText: { fontSize: 13, fontWeight: '700', color: '#8B4513' },
 	hList: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
 	hCard: { width: 110, gap: 4 },
 	hCover: { width: 110, height: 150, borderRadius: 10 },

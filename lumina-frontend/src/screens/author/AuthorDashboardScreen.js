@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Switch
+	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Switch, Image
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
@@ -36,6 +36,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	const [chapContent, setChapContent] = useState('');
 	const [chapIsVip, setChapIsVip] = useState(false);
 	const [savingChap, setSavingChap] = useState(false);
+	const [chapContentLoading, setChapContentLoading] = useState(false);
 
 	const loadData = useCallback(async () => {
 		setLoading(true);
@@ -117,11 +118,16 @@ const AuthorDashboardScreen = ({ navigation }) => {
 		]);
 	};
 
-	const openEditChapter = (chapter) => {
+	const openEditChapter = async (chapter) => {
 		setEditingChapter(chapter);
 		setChapTitle(chapter.title || '');
-		setChapContent(chapter.content || '');
 		setChapIsVip(!!chapter.is_vip);
+		setChapContent('');
+		setChapContentLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/chapters/${chapter.id}?user_id=${user.id}`).then(r => r.json());
+			if (res.status === 'success') setChapContent(res.data.content || '');
+		} catch {} finally { setChapContentLoading(false); }
 	};
 
 	const handleSaveChapter = async () => {
@@ -207,13 +213,15 @@ const AuthorDashboardScreen = ({ navigation }) => {
 						<ScrollView showsVerticalScrollIndicator={false}>
 							{[
 								{ label: "Tên truyện *", val: stTitle, set: setStTitle, ph: "Tên truyện..." },
-								{ label: "URL ảnh bìa", val: stThumb, set: setStThumb, ph: "https://..." },
 							].map(f => (
 								<View key={f.label} style={s.field}>
 									<Text style={s.fieldLabel}>{f.label}</Text>
 									<TextInput style={s.input} value={f.val} onChangeText={f.set} placeholder={f.ph} placeholderTextColor="#BBBBBB" autoCapitalize="none" />
 								</View>
 							))}
+							{stThumb.length > 0 && (
+								<Image source={{ uri: stThumb }} style={{ width: '100%', height: 140, borderRadius: 10, marginBottom: 8, marginTop: -6 }} resizeMode="cover" />
+							)}
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Mô tả</Text>
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
@@ -298,8 +306,17 @@ const AuthorDashboardScreen = ({ navigation }) => {
 							</View>
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Nội dung *</Text>
-								<TextInput style={[s.input, { height: 260 }]} value={chapContent} onChangeText={setChapContent} placeholder="Nội dung chương..." placeholderTextColor="#BBBBBB" multiline textAlignVertical="top" />
-								<Text style={{ fontSize: 11, color: "#BBBBBB", textAlign: "right", marginTop: 4 }}>{chapContent.length} ký tự</Text>
+								{chapContentLoading ? (
+									<View style={{ paddingVertical: 20, alignItems: "center" }}>
+										<ActivityIndicator color="#8B4513" />
+										<Text style={{ fontSize: 12, color: "#888888", marginTop: 6 }}>Đang tải nội dung...</Text>
+									</View>
+								) : (
+									<>
+										<TextInput style={[s.input, { height: 260 }]} value={chapContent} onChangeText={setChapContent} placeholder="Nội dung chương..." placeholderTextColor="#BBBBBB" multiline textAlignVertical="top" />
+										<Text style={{ fontSize: 11, color: "#BBBBBB", textAlign: "right", marginTop: 4 }}>{chapContent.length} ký tự</Text>
+									</>
+								)}
 							</View>
 							<View style={[s.field, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
 								<Text style={s.fieldLabel}>Chương VIP</Text>

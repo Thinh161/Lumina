@@ -106,6 +106,19 @@ const AdminDashboardScreen = ({ navigation }) => {
 		]);
 	};
 
+	const handleRevokeVip = (userId, username) => {
+		Alert.alert("Thu hồi VIP", `Thu hồi VIP của @${username}?`, [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Thu hồi", style: "destructive",
+				onPress: async () => {
+					await fetch(`${API_URL}/admin/users/${userId}/revoke-vip`, { method: 'PUT' });
+					loadData();
+				}
+			}
+		]);
+	};
+
 	const handleApproveAuthor = (userId, name) => {
 		Alert.alert("Duyệt tác giả", `Cấp quyền Author cho ${name}?`, [
 			{ text: "Hủy", style: "cancel" },
@@ -185,9 +198,13 @@ const AdminDashboardScreen = ({ navigation }) => {
 				<TouchableOpacity style={[s.banBtn, item.status !== 'active' && s.unbanBtn]} onPress={() => handleUserAction(item.id, item.status)}>
 					<Text style={s.banBtnText}>{item.status === 'active' ? 'Ban' : 'Unban'}</Text>
 				</TouchableOpacity>
-				{!item.is_vip && (
+				{!item.is_vip ? (
 					<TouchableOpacity style={[s.banBtn, { backgroundColor: '#8B4513' }]} onPress={() => handleGrantVip(item.id, item.username)}>
-						<Text style={s.banBtnText}>VIP</Text>
+						<Text style={s.banBtnText}>Cấp VIP</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity style={[s.banBtn, { backgroundColor: '#888888' }]} onPress={() => handleRevokeVip(item.id, item.username)}>
+						<Text style={s.banBtnText}>Xóa VIP</Text>
 					</TouchableOpacity>
 				)}
 			</View>

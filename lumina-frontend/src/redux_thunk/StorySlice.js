@@ -55,15 +55,20 @@ export const fetchChapters = createAsyncThunk("story/fetchChapters",
 	}
 );
 
-// 5. Thunk: Lấy nội dung chương
+// 5. Thunk: Lấy nội dung chương (có VIP enforcement)
 export const fetchChapterContent = createAsyncThunk("story/fetchChapterContent",
-	async (chapterId, { rejectWithValue }) => {
+	async ({ chapterId, userId }, { rejectWithValue }) => {
 		try {
-			const data = await fetch(`${API_URL}/chapters/${chapterId}`).then(res => res.json());
+			let url = `${API_URL}/chapters/${chapterId}`;
+			if (userId) url += `?user_id=${userId}`;
+			const response = await fetch(url);
+			const data = await response.json();
+			if (response.status === 403 || data.code === 'VIP_REQUIRED')
+				return rejectWithValue({ code: 'VIP_REQUIRED', message: data.message });
 			if (data.status === "success") return data.data;
-			return rejectWithValue("Không lấy được nội dung chương.");
+			return rejectWithValue({ message: "Không lấy được nội dung chương." });
 		} catch (error) {
-			return rejectWithValue("Lỗi kết nối server.");
+			return rejectWithValue({ message: "Lỗi kết nối server." });
 		}
 	}
 );
@@ -78,6 +83,7 @@ const storySlice = createSlice({
 		currentChapterContent: null,
 		loading: false,
 		error: null,
+		vipBlocked: false,
 	},
 	reducers: {
 		clearCurrentStory: (state) => {
@@ -86,6 +92,7 @@ const storySlice = createSlice({
 		},
 		clearChapterContent: (state) => {
 			state.currentChapterContent = null;
+			state.vipBlocked = false;
 		}
 	},
 	extraReducers: (builder) => {
@@ -133,6 +140,7 @@ const storySlice = createSlice({
 			// Xử lý Nội dung chương
 			.addCase(fetchChapterContent.pending, (state) => {
 				state.loading = true;
+				state.vipBlocked = false;
 			})
 			.addCase(fetchChapterContent.fulfilled, (state, action) => {
 				state.loading = false;
@@ -140,7 +148,8 @@ const storySlice = createSlice({
 			})
 			.addCase(fetchChapterContent.rejected, (state, action) => {
 				state.loading = false;
-				state.error = action.payload;
+				state.error = action.payload?.message || action.payload;
+				if (action.payload?.code === 'VIP_REQUIRED') state.vipBlocked = true;
 			});
 	}
 });

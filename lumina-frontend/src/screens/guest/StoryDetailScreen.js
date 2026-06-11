@@ -10,6 +10,7 @@ import {
 	ActivityIndicator,
 	Alert,
 	TextInput,
+	Share,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -29,14 +30,15 @@ const StoryDetailScreen = ({ navigation, route }) => {
 
 	const isInLibrary = libraryItems.some(item => item.id === storyId);
 
-	// Comments
 	const [comments, setComments] = useState([]);
 	const [commentText, setCommentText] = useState('');
 	const [rating, setRating] = useState(5);
 	const [postingComment, setPostingComment] = useState(false);
-	// Bookmark / tiếp tục đọc
+
+	const [editingCommentId, setEditingCommentId] = useState(null);
+	const [editingText, setEditingText] = useState('');
+
 	const [bookmark, setBookmark] = useState(null);
-	// Xem tất cả chương
 	const [showAllChapters, setShowAllChapters] = useState(false);
 	const CHAPTERS_PREVIEW = 5;
 
@@ -56,6 +58,17 @@ const StoryDetailScreen = ({ navigation, route }) => {
 		} catch {}
 	}, [user, storyId]);
 
+	useEffect(() => {
+		if (storyId) {
+			dispatch(fetchStoryDetails(storyId));
+			dispatch(fetchChapters(storyId));
+			loadComments();
+			loadBookmark();
+			fetch(`${API_URL}/stories/${storyId}/view`, { method: 'PUT' }).catch(() => {});
+		}
+		return () => { dispatch(clearCurrentStory()); };
+	}, [dispatch, storyId, loadComments, loadBookmark]);
+
 	const handlePostComment = async () => {
 		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để bình luận."); return; }
 		if (!commentText.trim()) return;
@@ -66,10 +79,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ user_id: user.id, story_id: storyId, content: commentText.trim(), rating }),
 			}).then(r => r.json());
-			if (res.status === "success") {
-				setCommentText('');
-				loadComments();
-			}
+			if (res.status === "success") { setCommentText(''); loadComments(); }
 		} finally { setPostingComment(false); }
 	};
 
@@ -88,18 +98,36 @@ const StoryDetailScreen = ({ navigation, route }) => {
 		]);
 	};
 
-	useEffect(() => {
-		if (storyId) {
-			dispatch(fetchStoryDetails(storyId));
-			dispatch(fetchChapters(storyId));
-			loadComments();
-			loadBookmark();
-			fetch(`${API_URL}/stories/${storyId}/view`, { method: 'PUT' }).catch(() => {});
-		}
-		return () => {
-			dispatch(clearCurrentStory());
-		};
-	}, [dispatch, storyId, loadComments, loadBookmark]);
+	const handleEditComment = (comment) => {
+		setEditingCommentId(comment.id);
+		setEditingText(comment.content);
+	};
+
+	const handleSaveEditComment = async (commentId) => {
+		if (!editingText.trim()) return;
+		try {
+			const res = await fetch(`${API_URL}/comments/${commentId}/${user.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ content: editingText.trim() }),
+			}).then(r => r.json());
+			if (res.status === 'success') {
+				setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: editingText.trim() } : c));
+				setEditingCommentId(null);
+			} else {
+				Alert.alert("Lỗi", res.message);
+			}
+		} catch { Alert.alert("Lỗi", "Không thể kết nối."); }
+	};
+
+	const handleShare = async () => {
+		if (!currentStory) return;
+		try {
+			await Share.share({
+				message: `Đọc "${currentStory.title}" của ${currentStory.author_name} trên ứng dụng Lumina!`,
+			});
+		} catch {}
+	};
 
 	if (loading || !currentStory) {
 		return (
@@ -109,35 +137,29 @@ const StoryDetailScreen = ({ navigation, route }) => {
 		);
 	}
 
+	const ratedComments = comments.filter(c => c.rating);
+	const avgRating = ratedComments.length > 0
+		? (ratedComments.reduce((s, c) => s + c.rating, 0) / ratedComments.length).toFixed(1)
+		: '—';
+
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<View style={styles.root}>
 				<View style={styles.topBar}>
-					<TouchableOpacity
-						style={styles.topBarButton}
-						onPress={() => navigation.goBack()}
-					>
+					<TouchableOpacity style={styles.topBarButton} onPress={() => navigation.goBack()}>
 						<MaterialIcons name="arrow-back" size={22} color="#8B4513" />
 					</TouchableOpacity>
 					<Text style={styles.topBarTitle}>App Đọc Truyện Online</Text>
-					<TouchableOpacity style={styles.topBarButton}>
+					<TouchableOpacity style={styles.topBarButton} onPress={handleShare}>
 						<MaterialIcons name="share" size={20} color="#8B4513" />
 					</TouchableOpacity>
 				</View>
 
-				<ScrollView
-					contentContainerStyle={styles.scrollContent}
-					showsVerticalScrollIndicator={false}
-				>
+				<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 					<View style={styles.hero}>
 						<View style={styles.coverWrap}>
 							<View style={styles.coverShadow} />
-							<Image
-								source={{
-									uri: currentStory.cover_image || DEFAULT_STORY_IMAGE,
-								}}
-								style={styles.coverImage}
-							/>
+							<Image source={{ uri: currentStory.cover_image || DEFAULT_STORY_IMAGE }} style={styles.coverImage} />
 							<View style={styles.badge}>
 								<Text style={styles.badgeText}>{currentStory.status === 'published' ? 'ĐÃ PHÁT HÀNH' : currentStory.status.toUpperCase()}</Text>
 							</View>
@@ -147,18 +169,13 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<Text style={styles.genre}>{currentStory.category_name?.toUpperCase() || "THỂ LOẠI"}</Text>
 							<Text style={styles.storyTitle}>{currentStory.title}</Text>
 							<View style={styles.authorRow}>
-								<View style={styles.authorIcon}>
-									<MaterialIcons name="person" size={14} color="#888888" />
-								</View>
+								<View style={styles.authorIcon} />
 								<Text style={styles.authorText}>Tác giả: {currentStory.author_name || "Đang cập nhật"}</Text>
 							</View>
-
 							<View style={styles.metaPills}>
 								<View style={styles.metaPill}>
 									<MaterialIcons name="star" size={16} color="#8B4513" />
-									<Text style={styles.metaPillText}>
-									{comments.length > 0 ? (comments.reduce((s, c) => s + (c.rating || 0), 0) / comments.filter(c => c.rating).length || 0).toFixed(1) : "—"}
-								</Text>
+									<Text style={styles.metaPillText}>{avgRating}</Text>
 								</View>
 								<View style={styles.metaPill}>
 									<MaterialIcons name="schedule" size={16} color="#8B4513" />
@@ -194,10 +211,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
 							disabled={libraryLoading}
 							onPress={async () => {
-								if (!user) {
-									Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện vào thư viện.");
-									return;
-								}
+								if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện."); return; }
 								setLibraryLoading(true);
 								try {
 									if (isInLibrary) {
@@ -206,16 +220,10 @@ const StoryDetailScreen = ({ navigation, route }) => {
 										await dispatch(addToLibrary({ user_id: user.id, story_id: storyId })).unwrap();
 										dispatch(fetchLibrary(user.id));
 									}
-								} finally {
-									setLibraryLoading(false);
-								}
+								} finally { setLibraryLoading(false); }
 							}}
 						>
-							<MaterialIcons
-								name={isInLibrary ? "bookmark" : "bookmark-border"}
-								size={18}
-								color={isInLibrary ? "#8B4513" : "#1A1A1A"}
-							/>
+							<MaterialIcons name={isInLibrary ? "bookmark" : "bookmark-border"} size={18} color={isInLibrary ? "#8B4513" : "#1A1A1A"} />
 							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8B4513" }]}>
 								{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
 							</Text>
@@ -226,21 +234,13 @@ const StoryDetailScreen = ({ navigation, route }) => {
 						<View style={styles.synopsisSection}>
 							<View style={styles.sectionHeader}>
 								<Text style={styles.sectionTitle}>Tóm Tắt Nội Dung</Text>
-								<MaterialCommunityIcons
-									name="auto-fix"
-									size={18}
-									color="#eda189"
-								/>
+								<MaterialCommunityIcons name="auto-fix" size={18} color="#eda189" />
 							</View>
 							<Text style={styles.synopsisText}>
 								{currentStory.description || "Chưa có tóm tắt nội dung cho truyện này."}
 							</Text>
-
 							<View style={styles.tagRow}>
-								{[
-									`#${currentStory.category_name || "Novel"}`,
-									"#Lumina"
-								].map((tag) => (
+								{[`#${currentStory.category_name || "Novel"}`, "#Lumina"].map(tag => (
 									<View key={tag} style={styles.tagChip}>
 										<Text style={styles.tagText}>{tag}</Text>
 									</View>
@@ -255,33 +255,26 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							</View>
 							<View style={styles.chapterList}>
 								{currentChapters.length > 0 ? (
-									(showAllChapters ? currentChapters : currentChapters.slice(0, CHAPTERS_PREVIEW)).map((chapter) => (
+									(showAllChapters ? currentChapters : currentChapters.slice(0, CHAPTERS_PREVIEW)).map(chapter => (
 										<TouchableOpacity
 											key={chapter.id}
-											style={[
-												styles.chapterItem,
-												!chapter.is_vip && styles.chapterItemOpen,
-												chapter.is_vip && styles.chapterItemLocked,
-											]}
+											style={[styles.chapterItem, !chapter.is_vip && styles.chapterItemOpen, chapter.is_vip && styles.chapterItemLocked]}
 											onPress={() => {
-											if (chapter.is_vip && !user?.is_vip) {
-												Alert.alert("Nội dung VIP", "Chương này dành riêng cho thành viên VIP. Hãy nâng cấp tài khoản để đọc.");
-												return;
-											}
-											navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id });
-										}}
+												if (chapter.is_vip && !user?.is_vip) {
+													Alert.alert("Nội dung VIP", "Chương này dành riêng cho thành viên VIP.");
+													return;
+												}
+												navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id });
+											}}
 										>
 											<View style={{ flex: 1 }}>
-												<Text style={[styles.chapterMeta, !chapter.is_vip && styles.chapterMetaOpen]}>
-													Chương {chapter.chapter_number}
-												</Text>
+												<Text style={[styles.chapterMeta, !chapter.is_vip && styles.chapterMetaOpen]}>Chương {chapter.chapter_number}</Text>
 												<Text style={styles.chapterTitle}>{chapter.title}</Text>
 											</View>
-											{!chapter.is_vip ? (
-												<MaterialIcons name="lock-open" size={18} color="#8B4513" />
-											) : (
-												<MaterialIcons name="lock" size={18} color={user?.is_vip ? "#8B4513" : "#BBBBBB"} />
-											)}
+											{!chapter.is_vip
+												? <MaterialIcons name="lock-open" size={18} color="#8B4513" />
+												: <MaterialIcons name="lock" size={18} color={user?.is_vip ? "#8B4513" : "#BBBBBB"} />
+											}
 										</TouchableOpacity>
 									))
 								) : (
@@ -290,25 +283,23 @@ const StoryDetailScreen = ({ navigation, route }) => {
 									</Text>
 								)}
 							</View>
-
 							{currentChapters.length > CHAPTERS_PREVIEW && (
 								<TouchableOpacity style={styles.viewAllButton} onPress={() => setShowAllChapters(!showAllChapters)}>
 									<Text style={styles.viewAllText}>
-										{showAllChapters ? `Thu gọn` : `Xem tất cả ${currentChapters.length} chương`}
+										{showAllChapters ? "Thu gọn" : `Xem tất cả ${currentChapters.length} chương`}
 									</Text>
 									<MaterialIcons name={showAllChapters ? "expand-less" : "expand-more"} size={18} color="#8B4513" />
 								</TouchableOpacity>
 							)}
 						</View>
 
-						{/* === BÌNH LUẬN === */}
+						{/* BÌNH LUẬN */}
 						<View style={styles.commentsSection}>
 							<View style={styles.sectionHeader}>
 								<Text style={styles.sectionTitle}>Bình Luận</Text>
 								<Text style={styles.chapterCount}>{comments.length}</Text>
 							</View>
 
-							{/* Nhập bình luận */}
 							<View style={styles.commentInputWrap}>
 								<View style={styles.starRow}>
 									{[1,2,3,4,5].map(n => (
@@ -341,7 +332,6 @@ const StoryDetailScreen = ({ navigation, route }) => {
 								</View>
 							</View>
 
-							{/* Danh sách bình luận */}
 							{comments.length === 0 ? (
 								<Text style={styles.noComments}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
 							) : (
@@ -352,21 +342,48 @@ const StoryDetailScreen = ({ navigation, route }) => {
 											<View style={styles.commentTop}>
 												<Text style={styles.commentName}>{c.full_name || c.username}</Text>
 												<View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-													{c.rating && (
+													{c.rating > 0 && (
 														<View style={styles.commentRatingRow}>
 															{Array.from({ length: c.rating }).map((_, i) => (
 																<MaterialIcons key={i} name="star" size={11} color="#8B4513" />
 															))}
 														</View>
 													)}
-													{user?.id === c.user_id && (
+													{user?.id === c.user_id && editingCommentId !== c.id && (
+														<TouchableOpacity onPress={() => handleEditComment(c)}>
+															<MaterialIcons name="edit" size={15} color="#8B4513" />
+														</TouchableOpacity>
+													)}
+													{user?.id === c.user_id && editingCommentId !== c.id && (
 														<TouchableOpacity onPress={() => handleDeleteComment(c.id)}>
-															<MaterialIcons name="delete-outline" size={16} color="#D32F2F" />
+															<MaterialIcons name="delete-outline" size={15} color="#D32F2F" />
 														</TouchableOpacity>
 													)}
 												</View>
 											</View>
-											<Text style={styles.commentText}>{c.content}</Text>
+
+											{editingCommentId === c.id ? (
+												<View style={styles.editWrap}>
+													<TextInput
+														style={styles.editInput}
+														value={editingText}
+														onChangeText={setEditingText}
+														multiline
+														autoFocus
+													/>
+													<View style={styles.editActions}>
+														<TouchableOpacity style={styles.saveBtn} onPress={() => handleSaveEditComment(c.id)}>
+															<Text style={styles.saveBtnText}>Lưu</Text>
+														</TouchableOpacity>
+														<TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingCommentId(null)}>
+															<Text style={styles.cancelBtnText}>Hủy</Text>
+														</TouchableOpacity>
+													</View>
+												</View>
+											) : (
+												<Text style={styles.commentText}>{c.content}</Text>
+											)}
+
 											<Text style={styles.commentTime}>{new Date(c.created_at).toLocaleDateString("vi-VN")}</Text>
 										</View>
 									</View>
@@ -376,23 +393,23 @@ const StoryDetailScreen = ({ navigation, route }) => {
 					</View>
 				</ScrollView>
 
-
-				<View style={styles.miniPlayer}>
-					<Image
-						source={{
-							uri:
-								"https://lh3.googleusercontent.com/aida-public/AB6AXuCeeyg722x5RHj-DcYj8XGkvzSA40ucCQHiZje0wgaWLqnBkyfizrlzb4a9GXszfEV4QJ6pTaTVDH97whWXwikxQegPGjJSEvRm5-oN6oyWtEVP_alY_JJOG3ESkuDuHPAh9u5eyMJG3te6uEjn2F1gItpWsV4na7-nTm7R7o8uuepd34ZfS7A67QoczTafPRWiKQ9zlz40-QrWQKVWpePjUUugWEQqEemASXODSlTPucUqO_ernK8SeF0pUMdX-FaT9iaA-V6uiz0",
-						}}
-						style={styles.miniCover}
-					/>
-					<View style={styles.miniText}>
-						<Text style={styles.miniMeta}>TIẾP TỤC ĐỌC</Text>
-						<Text style={styles.miniTitle}>Chương 02: Lời Nguyền...</Text>
-					</View>
-					<TouchableOpacity style={styles.miniPlay}>
-						<MaterialIcons name="play-arrow" size={18} color="#FFFFFF" />
+				{bookmark && (
+					<TouchableOpacity
+						style={styles.miniPlayer}
+						onPress={() => navigation.navigate("ChapterRead", { chapterId: bookmark.chapter_id, storyId: currentStory.id })}
+					>
+						<Image source={{ uri: currentStory.cover_image || DEFAULT_STORY_IMAGE }} style={styles.miniCover} />
+						<View style={styles.miniText}>
+							<Text style={styles.miniMeta}>TIẾP TỤC ĐỌC</Text>
+							<Text style={styles.miniTitle} numberOfLines={1}>
+								Chương {bookmark.chapter_number}: {bookmark.chapter_title}
+							</Text>
+						</View>
+						<View style={styles.miniPlay}>
+							<MaterialIcons name="play-arrow" size={18} color="#FFFFFF" />
+						</View>
 					</TouchableOpacity>
-				</View>
+				)}
 			</View>
 		</SafeAreaView>
 	);
@@ -458,12 +475,19 @@ const styles = StyleSheet.create({
 	commentItem: { flexDirection: "row", gap: 10 },
 	commentAvatar: { width: 36, height: 36, borderRadius: 18, marginTop: 2 },
 	commentBody: { flex: 1, gap: 3 },
-	commentTop: { flexDirection: "row", alignItems: "center", gap: 6 },
+	commentTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 	commentName: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
 	commentRatingRow: { flexDirection: "row" },
 	commentText: { fontSize: 13, color: "#555555", lineHeight: 18 },
 	commentTime: { fontSize: 10, color: "#BBBBBB" },
-	miniPlayer: { position: "absolute", right: 16, bottom: 80, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: "#EBEBEB", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+	editWrap: { gap: 6 },
+	editInput: { backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#8B4513", paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, color: "#1A1A1A" },
+	editActions: { flexDirection: "row", gap: 8 },
+	saveBtn: { backgroundColor: "#8B4513", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+	saveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
+	cancelBtn: { backgroundColor: "#F5F5F5", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+	cancelBtnText: { color: "#888888", fontWeight: "700", fontSize: 12 },
+	miniPlayer: { position: "absolute", right: 16, bottom: 80, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: "#EBEBEB", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3, maxWidth: 260 },
 	miniCover: { width: 40, height: 40, borderRadius: 8 },
 	miniText: { flex: 1 },
 	miniMeta: { fontSize: 10, color: "#8B4513", fontWeight: "700" },
