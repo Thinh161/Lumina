@@ -56,10 +56,10 @@ const ProfileScreen = ({ navigation }) => {
 			<View style={styles.root}>
 				<View style={styles.topBar}>
 					<View style={styles.topBarLeft}>
-						<MaterialIcons name="menu" size={22} color="#8c4f3b" />
+						<MaterialIcons name="menu" size={22} color="#1A1A1A" />
 						<Text style={styles.topBarTitle}>App Đọc Truyện Online</Text>
 					</View>
-					<MaterialIcons name="search" size={22} color="#8c4f3b" />
+					<MaterialIcons name="search" size={22} color="#1A1A1A" />
 				</View>
 
 				<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -67,7 +67,7 @@ const ProfileScreen = ({ navigation }) => {
 						<View style={styles.avatarWrap}>
 							<Image source={{ uri: avatarUri }} style={styles.avatar} />
 							<TouchableOpacity style={styles.editAvatarButton} onPress={() => navigation.navigate("EditProfile")}>
-								<MaterialIcons name="edit" size={14} color="#fff7f5" />
+								<MaterialIcons name="edit" size={14} color="#FFFFFF" />
 							</TouchableOpacity>
 						</View>
 
@@ -94,14 +94,14 @@ const ProfileScreen = ({ navigation }) => {
 							<View>
 								<Text style={styles.vipLabel}>Số dư tài khoản</Text>
 								<View style={styles.vipRow}>
-									<MaterialCommunityIcons name="currency-usd" size={20} color="#8c4f3b" />
+									<MaterialCommunityIcons name="currency-usd" size={20} color="#8B4513" />
 									<Text style={styles.vipValue}>{balanceText}</Text>
 								</View>
 								<Text style={styles.vipSubtitle}>Xu hiện có trong tài khoản của bạn</Text>
 							</View>
 							<TouchableOpacity style={styles.vipButton}>
 								<Text style={styles.vipButtonText}>Nạp Xu Ngay</Text>
-								<MaterialIcons name="arrow-forward" size={16} color="#fff7f5" />
+								<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
 							</TouchableOpacity>
 							<View style={styles.vipGlow} />
 						</View>
@@ -115,7 +115,7 @@ const ProfileScreen = ({ navigation }) => {
 								</TouchableOpacity>
 							</View>
 							{shownLibrary.length === 0 ? (
-								<Text style={{ fontSize: 13, color: "#b3b2af", textAlign: "center", paddingVertical: 12 }}>
+								<Text style={{ fontSize: 13, color: "#BBBBBB", textAlign: "center", paddingVertical: 12 }}>
 									Chưa có truyện nào. Thêm truyện yêu thích vào đây!
 								</Text>
 							) : (
@@ -146,21 +146,21 @@ const ProfileScreen = ({ navigation }) => {
 									>
 										<View style={styles.managementLeft}>
 											<View style={styles.managementIconWrap}>
-												<MaterialIcons name={item.icon} size={18} color="#8c4f3b" />
+												<MaterialIcons name={item.icon} size={18} color="#8B4513" />
 											</View>
 											<View>
 												<Text style={styles.managementItemTitle}>{item.title}</Text>
 												<Text style={styles.managementItemSubtitle}>{item.subtitle}</Text>
 											</View>
 										</View>
-										<MaterialIcons name="chevron-right" size={20} color="#b3b2af" />
+										<MaterialIcons name="chevron-right" size={20} color="#BBBBBB" />
 									</TouchableOpacity>
 								))}
 							</View>
 						</View>
 
 						<TouchableOpacity style={styles.logoutRow} onPress={handleLogout}>
-							<MaterialIcons name="logout" size={18} color="#a83836" />
+							<MaterialIcons name="logout" size={18} color="#D32F2F" />
 							<Text style={styles.logoutText}>Đăng xuất khỏi tài khoản</Text>
 						</TouchableOpacity>
 					</View>
@@ -171,52 +171,52 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: "#fcf9f7" },
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
 	root: { flex: 1, position: "relative" },
-	topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#fcf9f7", borderBottomWidth: 1, borderBottomColor: "rgba(179, 178, 175, 0.2)" },
+	topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	topBarLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-	topBarTitle: { fontSize: 18, fontWeight: "700", color: "#323331" },
+	topBarTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A1A" },
 	scrollContent: { padding: 16, paddingBottom: 140 },
 	profileHeader: { gap: 16, marginBottom: 24 },
 	avatarWrap: { alignSelf: "center", position: "relative" },
-	avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: "#f6f3f1" },
-	editAvatarButton: { position: "absolute", right: 6, bottom: 6, backgroundColor: "#8c4f3b", padding: 8, borderRadius: 999 },
+	avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: "#EBEBEB" },
+	editAvatarButton: { position: "absolute", right: 6, bottom: 6, backgroundColor: "#8B4513", padding: 8, borderRadius: 999 },
 	profileInfo: { alignItems: "center", gap: 6 },
-	profileBadge: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#8c4f3b" },
-	profileName: { fontSize: 28, fontWeight: "700", color: "#323331" },
-	profileQuote: { fontSize: 14, fontStyle: "italic", color: "#5f5f5d", textAlign: "center" },
+	profileBadge: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#8B4513" },
+	profileName: { fontSize: 28, fontWeight: "700", color: "#1A1A1A" },
+	profileQuote: { fontSize: 14, fontStyle: "italic", color: "#888888", textAlign: "center" },
 	statsRow: { flexDirection: "row", justifyContent: "center", gap: 12 },
-	statCard: { backgroundColor: "#f6f3f1", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, alignItems: "center" },
-	statValue: { fontSize: 20, fontWeight: "700", color: "#8c4f3b" },
-	statLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(50, 51, 49, 0.6)", marginTop: 4 },
+	statCard: { backgroundColor: "#F5F5F5", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, alignItems: "center" },
+	statValue: { fontSize: 20, fontWeight: "700", color: "#8B4513" },
+	statLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 1.5, textTransform: "uppercase", color: "#888888", marginTop: 4 },
 	dashboardGrid: { gap: 16 },
-	vipCard: { backgroundColor: "#fdae95", borderRadius: 16, padding: 18, gap: 16, overflow: "hidden" },
-	vipLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#622d1c" },
+	vipCard: { backgroundColor: "#F2E8E3", borderRadius: 16, padding: 18, gap: 16, overflow: "hidden", borderWidth: 1, borderColor: "#EBEBEB" },
+	vipLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#8B4513" },
 	vipRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-	vipValue: { fontSize: 30, fontWeight: "800", color: "#622d1c" },
-	vipSubtitle: { fontSize: 12, color: "rgba(98, 45, 28, 0.7)", marginTop: 6 },
-	vipButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#8c4f3b", paddingVertical: 12, borderRadius: 999 },
-	vipButtonText: { fontSize: 11, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#fff7f5" },
-	vipGlow: { position: "absolute", right: -40, top: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(140, 79, 59, 0.1)" },
-	libraryCard: { backgroundColor: "#f6f3f1", borderRadius: 16, padding: 16, gap: 12 },
+	vipValue: { fontSize: 30, fontWeight: "800", color: "#8B4513" },
+	vipSubtitle: { fontSize: 12, color: "#888888", marginTop: 6 },
+	vipButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#8B4513", paddingVertical: 12, borderRadius: 999 },
+	vipButtonText: { fontSize: 11, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#FFFFFF" },
+	vipGlow: { position: "absolute", right: -40, top: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(139, 69, 19, 0.08)" },
+	libraryCard: { backgroundColor: "#FAFAFA", borderRadius: 16, padding: 16, gap: 12, borderWidth: 1, borderColor: "#EBEBEB" },
 	libraryHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-	libraryTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#5f5f5d" },
-	libraryAction: { fontSize: 10, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#8c4f3b" },
+	libraryTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
+	libraryAction: { fontSize: 12, fontWeight: "600", color: "#8B4513" },
 	libraryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 	libraryItem: { width: "48%" },
 	libraryCover: { width: "100%", height: 140, borderRadius: 10, marginBottom: 6 },
-	libraryTag: { fontSize: 9, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#8c4f3b" },
-	libraryName: { fontSize: 12, fontWeight: "700", color: "#323331", marginTop: 2 },
-	managementCard: { backgroundColor: "#e4e2df", borderRadius: 16, padding: 18, gap: 12 },
-	managementTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#5f5f5d" },
+	libraryTag: { fontSize: 9, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", color: "#8B4513" },
+	libraryName: { fontSize: 12, fontWeight: "700", color: "#1A1A1A", marginTop: 2 },
+	managementCard: { backgroundColor: "#FAFAFA", borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: "#EBEBEB" },
+	managementTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A1A", marginBottom: 4 },
 	managementGrid: { gap: 6 },
-	managementRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(179, 178, 175, 0.2)" },
+	managementRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	managementLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-	managementIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#f6f3f1", alignItems: "center", justifyContent: "center" },
-	managementItemTitle: { fontSize: 13, fontWeight: "700", color: "#323331" },
-	managementItemSubtitle: { fontSize: 10, color: "#5f5f5d", marginTop: 2 },
+	managementIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+	managementItemTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
+	managementItemSubtitle: { fontSize: 10, color: "#888888", marginTop: 2 },
 	logoutRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12 },
-	logoutText: { fontSize: 11, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase", color: "#a83836" },
+	logoutText: { fontSize: 13, fontWeight: "700", color: "#D32F2F" },
 });
 
 export default ProfileScreen;

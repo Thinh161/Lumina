@@ -76,7 +76,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 	if (loading || !currentStory) {
 		return (
 			<SafeAreaView style={[styles.safeArea, { justifyContent: "center", alignItems: "center" }]}>
-				<ActivityIndicator size="large" color="#dca77c" />
+				<ActivityIndicator size="large" color="#8B4513" />
 			</SafeAreaView>
 		);
 	}
@@ -89,11 +89,11 @@ const StoryDetailScreen = ({ navigation, route }) => {
 						style={styles.topBarButton}
 						onPress={() => navigation.goBack()}
 					>
-						<MaterialIcons name="arrow-back" size={22} color="#8c4f3b" />
+						<MaterialIcons name="arrow-back" size={22} color="#8B4513" />
 					</TouchableOpacity>
 					<Text style={styles.topBarTitle}>App Đọc Truyện Online</Text>
 					<TouchableOpacity style={styles.topBarButton}>
-						<MaterialIcons name="share" size={20} color="#8c4f3b" />
+						<MaterialIcons name="share" size={20} color="#8B4513" />
 					</TouchableOpacity>
 				</View>
 
@@ -120,22 +120,22 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<Text style={styles.storyTitle}>{currentStory.title}</Text>
 							<View style={styles.authorRow}>
 								<View style={styles.authorIcon}>
-									<MaterialIcons name="person" size={14} color="#5f5f5d" />
+									<MaterialIcons name="person" size={14} color="#888888" />
 								</View>
 								<Text style={styles.authorText}>Tác giả: {currentStory.author_name || "Đang cập nhật"}</Text>
 							</View>
 
 							<View style={styles.metaPills}>
 								<View style={styles.metaPill}>
-									<MaterialIcons name="star" size={16} color="#8c4f3b" />
+									<MaterialIcons name="star" size={16} color="#8B4513" />
 									<Text style={styles.metaPillText}>4.9</Text>
 								</View>
 								<View style={styles.metaPill}>
-									<MaterialIcons name="schedule" size={16} color="#8c4f3b" />
+									<MaterialIcons name="schedule" size={16} color="#8B4513" />
 									<Text style={styles.metaPillText}>Đang ra</Text>
 								</View>
 								<View style={styles.metaPill}>
-									<MaterialIcons name="visibility" size={16} color="#8c4f3b" />
+									<MaterialIcons name="visibility" size={16} color="#8B4513" />
 									<Text style={styles.metaPillText}>{currentStory.views || 0} lượt xem</Text>
 								</View>
 							</View>
@@ -174,9 +174,9 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<MaterialIcons
 								name={isInLibrary ? "bookmark" : "bookmark-border"}
 								size={18}
-								color={isInLibrary ? "#8c4f3b" : "#323331"}
+								color={isInLibrary ? "#8B4513" : "#1A1A1A"}
 							/>
-							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8c4f3b" }]}>
+							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8B4513" }]}>
 								{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
 							</Text>
 						</TouchableOpacity>
@@ -237,14 +237,14 @@ const StoryDetailScreen = ({ navigation, route }) => {
 												<Text style={styles.chapterTitle}>{chapter.title}</Text>
 											</View>
 											{!chapter.is_vip ? (
-												<MaterialIcons name="lock-open" size={18} color="#8c4f3b" />
+												<MaterialIcons name="lock-open" size={18} color="#8B4513" />
 											) : (
-												<MaterialIcons name="lock" size={18} color="#b3b2af" />
+												<MaterialIcons name="lock" size={18} color="#BBBBBB" />
 											)}
 										</TouchableOpacity>
 									))
 								) : (
-									<Text style={{ textAlign: "center", color: "#8c4f3b", marginVertical: 10 }}>
+									<Text style={{ textAlign: "center", color: "#8B4513", marginVertical: 10 }}>
 										Truyện chưa cập nhật chương nào.
 									</Text>
 								)}
@@ -267,7 +267,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 								<View style={styles.starRow}>
 									{[1,2,3,4,5].map(n => (
 										<TouchableOpacity key={n} onPress={() => setRating(n)}>
-											<MaterialIcons name={n <= rating ? "star" : "star-border"} size={22} color="#dca77c" />
+											<MaterialIcons name={n <= rating ? "star" : "star-border"} size={22} color="#8B4513" />
 										</TouchableOpacity>
 									))}
 									<Text style={styles.ratingLabel}>{rating}/5</Text>
@@ -276,7 +276,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 									<TextInput
 										style={styles.commentInput}
 										placeholder={user ? "Viết bình luận..." : "Đăng nhập để bình luận"}
-										placeholderTextColor="#b3b2af"
+										placeholderTextColor="#BBBBBB"
 										value={commentText}
 										onChangeText={setCommentText}
 										editable={!!user}
@@ -308,7 +308,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 												{c.rating && (
 													<View style={styles.commentRatingRow}>
 														{Array.from({ length: c.rating }).map((_, i) => (
-															<MaterialIcons key={i} name="star" size={11} color="#dca77c" />
+															<MaterialIcons key={i} name="star" size={11} color="#8B4513" />
 														))}
 													</View>
 												)}
@@ -346,334 +346,76 @@ const StoryDetailScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: "#fcf9f7",
-	},
-	root: {
-		flex: 1,
-		position: "relative",
-	},
-	topBar: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "rgba(179, 178, 175, 0.2)",
-		backgroundColor: "#fcf9f7",
-	},
-	topBarButton: {
-		padding: 6,
-	},
-	topBarTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#323331",
-	},
-	scrollContent: {
-		paddingBottom: 200,
-	},
-	hero: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
-		paddingBottom: 24,
-		gap: 20,
-	},
-	coverWrap: {
-		position: "relative",
-		width: "60%",
-	},
-	coverShadow: {
-		position: "absolute",
-		top: -8,
-		left: -8,
-		width: "100%",
-		height: "100%",
-		backgroundColor: "#f6f3f1",
-		borderRadius: 16,
-		transform: [{ rotate: "3deg" }],
-	},
-	coverImage: {
-		width: "100%",
-		aspectRatio: 2 / 3,
-		borderRadius: 16,
-	},
-	badge: {
-		position: "absolute",
-		top: 12,
-		right: 12,
-		backgroundColor: "rgba(255, 255, 255, 0.8)",
-		borderRadius: 999,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-	},
-	badgeText: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 1,
-		color: "#8c4f3b",
-	},
-	metaSection: {
-		gap: 12,
-	},
-	genre: {
-		fontSize: 11,
-		fontWeight: "700",
-		letterSpacing: 2.5,
-		color: "#8c4f3b",
-	},
-	storyTitle: {
-		fontSize: 30,
-		fontWeight: "700",
-		color: "#323331",
-	},
-	authorRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-	},
-	authorIcon: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		backgroundColor: "#e4e2df",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	authorText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#5f5f5d",
-	},
-	metaPills: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 10,
-	},
-	metaPill: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 6,
-		backgroundColor: "#f6f3f1",
-		borderRadius: 999,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-	},
-	metaPillText: {
-		fontSize: 11,
-		fontWeight: "700",
-		color: "#323331",
-	},
-	actionsRow: {
-		paddingHorizontal: 16,
-		gap: 12,
-	},
-	actionButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 8,
-		borderRadius: 999,
-		paddingVertical: 14,
-	},
-	actionPrimary: {
-		backgroundColor: "#8c4f3b",
-	},
-	actionPrimaryText: {
-		color: "#fff7f5",
-		fontSize: 12,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-	},
-	actionButtonGhost: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 8,
-		borderRadius: 999,
-		paddingVertical: 14,
-		borderWidth: 1,
-		borderColor: "rgba(179, 178, 175, 0.3)",
-		backgroundColor: "#e4e2df",
-	},
-	actionButtonSaved: {
-		borderColor: "rgba(140,79,59,0.4)",
-		backgroundColor: "rgba(140,79,59,0.08)",
-	},
-	actionGhostText: {
-		color: "#323331",
-		fontSize: 12,
-		fontWeight: "700",
-		letterSpacing: 1.5,
-		textTransform: "uppercase",
-	},
-	contentRow: {
-		paddingHorizontal: 16,
-		paddingTop: 24,
-		gap: 24,
-	},
-	synopsisSection: {
-		gap: 16,
-	},
-	sectionHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingBottom: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: "rgba(179, 178, 175, 0.2)",
-	},
-	sectionTitle: {
-		fontSize: 20,
-		fontWeight: "700",
-		color: "#323331",
-	},
-	synopsisText: {
-		fontSize: 14,
-		color: "#5f5f5d",
-		lineHeight: 22,
-	},
-	tagRow: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 8,
-	},
-	tagChip: {
-		backgroundColor: "#f6f3f1",
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-	},
-	tagText: {
-		fontSize: 11,
-		fontWeight: "600",
-		color: "#5f5f5d",
-	},
-	chapterSection: {
-		gap: 16,
-	},
-	chapterCount: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 2,
-		color: "#8c4f3b",
-	},
-	chapterList: {
-		gap: 8,
-	},
-	chapterItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: 14,
-		borderRadius: 12,
-		backgroundColor: "#fcf9f7",
-	},
-	chapterItemOpen: {
-		borderLeftWidth: 2,
-		borderLeftColor: "#8c4f3b",
-		backgroundColor: "#f6f3f1",
-	},
-	chapterItemLocked: {
-		opacity: 0.65,
-	},
-	chapterMeta: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-		color: "#7b7b78",
-	},
-	chapterMetaOpen: {
-		color: "#8c4f3b",
-	},
-	chapterTitle: {
-		fontSize: 14,
-		fontWeight: "700",
-		color: "#323331",
-		marginTop: 4,
-	},
-	viewAllButton: {
-		paddingVertical: 12,
-	},
-	viewAllText: {
-		fontSize: 11,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-		color: "#8c4f3b",
-		textAlign: "center",
-	},
-	commentsSection: {
-		marginTop: 8,
-		backgroundColor: "#fff",
-		borderRadius: 16,
-		padding: 16,
-		gap: 12,
-	},
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+	root: { flex: 1 },
+	topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0", backgroundColor: "#FFFFFF" },
+	topBarButton: { padding: 6 },
+	topBarTitle: { fontSize: 16, fontWeight: "700", color: "#1A1A1A" },
+	scrollContent: { paddingBottom: 200 },
+	hero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20, gap: 16 },
+	coverWrap: { position: "relative", width: "50%", alignSelf: "center" },
+	coverShadow: { display: "none" },
+	coverImage: { width: "100%", aspectRatio: 2 / 3, borderRadius: 12 },
+	badge: { position: "absolute", top: 8, right: 8, backgroundColor: "#F2E8E3", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+	badgeText: { fontSize: 10, fontWeight: "700", color: "#8B4513" },
+	metaSection: { gap: 8, alignItems: "center" },
+	genre: { fontSize: 11, fontWeight: "700", color: "#8B4513", backgroundColor: "#F2E8E3", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+	storyTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A", textAlign: "center" },
+	authorRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+	authorIcon: { display: "none" },
+	authorText: { fontSize: 13, color: "#888888" },
+	metaPills: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center" },
+	metaPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F5F5F5", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+	metaPillText: { fontSize: 12, color: "#1A1A1A" },
+	actionsRow: { paddingHorizontal: 16, gap: 10 },
+	actionButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, paddingVertical: 13 },
+	actionPrimary: { backgroundColor: "#8B4513" },
+	actionPrimaryText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+	actionButtonGhost: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, paddingVertical: 13, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5" },
+	actionButtonSaved: { borderColor: "#8B4513", backgroundColor: "#F2E8E3" },
+	actionGhostText: { color: "#1A1A1A", fontSize: 14, fontWeight: "600" },
+	contentRow: { paddingHorizontal: 16, paddingTop: 20, gap: 20 },
+	synopsisSection: { gap: 10 },
+	sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	sectionTitle: { fontSize: 16, fontWeight: "700", color: "#1A1A1A" },
+	synopsisText: { fontSize: 14, color: "#555555", lineHeight: 22 },
+	tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+	tagChip: { backgroundColor: "#F5F5F5", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
+	tagText: { fontSize: 11, color: "#888888" },
+	chapterSection: { gap: 10 },
+	chapterCount: { fontSize: 12, color: "#8B4513", fontWeight: "700" },
+	chapterList: { gap: 6 },
+	chapterItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderRadius: 10, backgroundColor: "#FAFAFA", borderWidth: 1, borderColor: "#F0F0F0" },
+	chapterItemOpen: { borderLeftWidth: 3, borderLeftColor: "#8B4513" },
+	chapterItemLocked: { opacity: 0.5 },
+	chapterMeta: { fontSize: 11, color: "#AAAAAA" },
+	chapterMetaOpen: { color: "#8B4513" },
+	chapterTitle: { fontSize: 13, fontWeight: "600", color: "#1A1A1A", marginTop: 2 },
+	viewAllButton: { paddingVertical: 12 },
+	viewAllText: { fontSize: 13, fontWeight: "700", color: "#8B4513", textAlign: "center" },
+	commentsSection: { marginTop: 0, backgroundColor: "#FAFAFA", borderRadius: 12, padding: 14, gap: 12, borderWidth: 1, borderColor: "#F0F0F0" },
 	commentInputWrap: { gap: 8 },
 	starRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-	ratingLabel: { fontSize: 12, color: "#8c4f3b", marginLeft: 4, fontWeight: "700" },
+	ratingLabel: { fontSize: 12, color: "#8B4513", marginLeft: 4, fontWeight: "700" },
 	commentRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
-	commentInput: {
-		flex: 1, backgroundColor: "#f6f3f1", borderRadius: 10,
-		paddingHorizontal: 12, paddingVertical: 8, fontSize: 13,
-		color: "#323331", maxHeight: 80,
-	},
-	sendBtn: {
-		backgroundColor: "#8c4f3b", borderRadius: 999,
-		width: 38, height: 38, alignItems: "center", justifyContent: "center",
-	},
+	commentInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: "#1A1A1A", maxHeight: 80 },
+	sendBtn: { backgroundColor: "#8B4513", borderRadius: 10, width: 38, height: 38, alignItems: "center", justifyContent: "center" },
 	sendBtnDisabled: { opacity: 0.4 },
-	noComments: { fontSize: 13, color: "#b3b2af", textAlign: "center", paddingVertical: 12 },
+	noComments: { fontSize: 13, color: "#BBBBBB", textAlign: "center", paddingVertical: 12 },
 	commentItem: { flexDirection: "row", gap: 10 },
 	commentAvatar: { width: 36, height: 36, borderRadius: 18, marginTop: 2 },
 	commentBody: { flex: 1, gap: 3 },
 	commentTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-	commentName: { fontSize: 13, fontWeight: "700", color: "#323331" },
+	commentName: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
 	commentRatingRow: { flexDirection: "row" },
-	commentText: { fontSize: 13, color: "#5f5f5d", lineHeight: 18 },
-	commentTime: { fontSize: 10, color: "#b3b2af" },
-	miniPlayer: {
-		position: "absolute",
-		right: 16,
-		bottom: 96,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 12,
-		backgroundColor: "rgba(255, 255, 255, 0.7)",
-		borderRadius: 16,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.6)",
-	},
-	miniCover: {
-		width: 44,
-		height: 44,
-		borderRadius: 8,
-	},
-	miniText: {
-		flex: 1,
-	},
-	miniMeta: {
-		fontSize: 9,
-		fontWeight: "700",
-		letterSpacing: 2,
-		color: "#8c4f3b",
-	},
-	miniTitle: {
-		fontSize: 12,
-		fontWeight: "700",
-		color: "#323331",
-	},
-	miniPlay: {
-		backgroundColor: "#8c4f3b",
-		padding: 8,
-		borderRadius: 999,
-	},
+	commentText: { fontSize: 13, color: "#555555", lineHeight: 18 },
+	commentTime: { fontSize: 10, color: "#BBBBBB" },
+	miniPlayer: { position: "absolute", right: 16, bottom: 80, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: "#EBEBEB", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+	miniCover: { width: 40, height: 40, borderRadius: 8 },
+	miniText: { flex: 1 },
+	miniMeta: { fontSize: 10, color: "#8B4513", fontWeight: "700" },
+	miniTitle: { fontSize: 12, fontWeight: "600", color: "#1A1A1A" },
+	miniPlay: { backgroundColor: "#8B4513", padding: 8, borderRadius: 8 },
 });
 
 export default StoryDetailScreen;

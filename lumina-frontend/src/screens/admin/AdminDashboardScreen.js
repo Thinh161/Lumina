@@ -128,7 +128,7 @@ const AdminDashboardScreen = () => {
 			</View>
 
 			{loading ? (
-				<View style={s.center}><ActivityIndicator size="large" color="#dca77c" /></View>
+				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 			) : tab === 'pending' && pendingStories.length === 0 ? (
 				<View style={s.center}>
 					<MaterialIcons name="check-circle" size={52} color="#2e7d32" />
@@ -144,38 +144,38 @@ const AdminDashboardScreen = () => {
 };
 
 const s = StyleSheet.create({
-	safe: { flex: 1, backgroundColor: "#fcf9f7" },
-	header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-	headerTitle: { fontSize: 22, fontWeight: "800", color: "#323331" },
-	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginBottom: 4 },
-	tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10, backgroundColor: "#e4e2df" },
-	tabBtnActive: { backgroundColor: "#8c4f3b" },
-	tabText: { fontSize: 13, fontWeight: "700", color: "#5f5f5d" },
-	tabTextActive: { color: "#fff" },
+	safe: { flex: 1, backgroundColor: "#FFFFFF" },
+	header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
+	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginVertical: 12 },
+	tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
+	tabBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
+	tabText: { fontSize: 13, fontWeight: "700", color: "#888888" },
+	tabTextActive: { color: "#FFFFFF" },
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-	emptyText: { fontSize: 14, color: "#5f5f5d" },
-	card: { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "rgba(179,178,175,0.2)", elevation: 2 },
+	emptyText: { fontSize: 14, color: "#888888" },
+	card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "#F0F0F0" },
 	cardMain: { flexDirection: "row", gap: 12, marginBottom: 12 },
 	cover: { width: 70, height: 100, borderRadius: 8 },
 	cardInfo: { flex: 1 },
-	cardTitle: { fontSize: 14, fontWeight: "700", color: "#323331", lineHeight: 20 },
-	cardMeta: { fontSize: 12, color: "#8c4f3b", marginTop: 2 },
-	cardDesc: { fontSize: 11, color: "#5f5f5d", marginTop: 4, lineHeight: 16 },
+	cardTitle: { fontSize: 14, fontWeight: "700", color: "#1A1A1A", lineHeight: 20 },
+	cardMeta: { fontSize: 12, color: "#888888", marginTop: 2 },
+	cardDesc: { fontSize: 11, color: "#888888", marginTop: 4, lineHeight: 16 },
 	actions: { flexDirection: "row", gap: 8 },
-	approveBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "#2e7d32", paddingVertical: 8, borderRadius: 8 },
-	approveBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-	rejectBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "#c62828", paddingVertical: 8, borderRadius: 8 },
-	rejectBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-	userCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: "rgba(179,178,175,0.2)", elevation: 1 },
+	approveBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "#2E7D32", paddingVertical: 8, borderRadius: 8 },
+	approveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+	rejectBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "#D32F2F", paddingVertical: 8, borderRadius: 8 },
+	rejectBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+	userCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: "#F0F0F0" },
 	avatar: { width: 46, height: 46, borderRadius: 23 },
 	userInfo: { flex: 1, marginLeft: 12, gap: 2 },
-	userName: { fontSize: 14, fontWeight: "700", color: "#323331" },
-	userMeta: { fontSize: 11, color: "#5f5f5d" },
+	userName: { fontSize: 14, fontWeight: "700", color: "#1A1A1A" },
+	userMeta: { fontSize: 11, color: "#888888" },
 	statusDot: { alignSelf: "flex-start", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, marginTop: 2 },
-	statusDotText: { fontSize: 10, fontWeight: "700", color: "#fff" },
-	banBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: "#c62828" },
-	unbanBtn: { backgroundColor: "#2e7d32" },
-	banBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+	statusDotText: { fontSize: 10, fontWeight: "700", color: "#FFFFFF" },
+	banBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: "#D32F2F" },
+	unbanBtn: { backgroundColor: "#2E7D32" },
+	banBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
 });
 
 export default AdminDashboardScreen;

@@ -60,10 +60,10 @@ const UserNavigation = () => {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: "#fff7f5",
-        tabBarInactiveTintColor: "#323331",
-        tabBarActiveBackgroundColor: "#8c4f3b",
-        tabBarInactiveBackgroundColor: "rgba(252, 249, 247, 0.92)",
+        tabBarActiveTintColor: "#8B4513",
+        tabBarInactiveTintColor: "#AAAAAA",
+        tabBarActiveBackgroundColor: "#FFFFFF",
+        tabBarInactiveBackgroundColor: "#FFFFFF",
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
         tabBarItemStyle: styles.tabItem,
@@ -106,9 +106,9 @@ const UserNavigation = () => {
 };
 
 const styles = StyleSheet.create({
-  tabBar: { backgroundColor: "rgba(252, 249, 247, 0.92)", borderTopWidth: 1, borderTopColor: "rgba(179, 178, 175, 0.2)", height: 64, paddingBottom: 8, paddingTop: 8 },
-  tabLabel: { fontSize: 8, fontWeight: "700", letterSpacing: 2, textTransform: "uppercase" },
-  tabItem: { borderRadius: 999, marginHorizontal: 8, overflow: "hidden" },
+  tabBar: { backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: "#F0F0F0", height: 60, paddingBottom: 6, paddingTop: 6 },
+  tabLabel: { fontSize: 10, fontWeight: "600" },
+  tabItem: { borderRadius: 8 },
 });
 
 export default UserNavigation;

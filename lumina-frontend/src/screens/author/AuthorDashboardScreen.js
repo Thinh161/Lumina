@@ -65,7 +65,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 			</View>
 			<Text style={s.cardMeta}>{item.category_name} • {item.chapter_count} chương</Text>
 			<TouchableOpacity style={s.chapBtn} onPress={() => navigation.navigate("AddChapter", { storyId: item.id, storyTitle: item.title })}>
-				<MaterialIcons name="add" size={15} color="#8c4f3b" />
+				<MaterialIcons name="add" size={15} color="#8B4513" />
 				<Text style={s.chapBtnText}>Thêm chương</Text>
 			</TouchableOpacity>
 		</View>
@@ -84,10 +84,10 @@ const AuthorDashboardScreen = ({ navigation }) => {
 				</TouchableOpacity>
 			</View>
 
-			{loading ? <View style={s.center}><ActivityIndicator size="large" color="#dca77c" /></View>
+			{loading ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 				: stories.length === 0 ? (
 					<View style={s.center}>
-						<MaterialIcons name="auto-stories" size={52} color="#dca77c" />
+						<MaterialIcons name="auto-stories" size={52} color="#8B4513" />
 						<Text style={s.emptyText}>Chưa có truyện nào.</Text>
 					</View>
 				) : (
@@ -99,7 +99,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 					<View style={s.sheet}>
 						<View style={s.sheetHeader}>
 							<Text style={s.sheetTitle}>Đăng truyện mới</Text>
-							<TouchableOpacity onPress={() => setShowModal(false)}><MaterialIcons name="close" size={22} color="#5f5f5d" /></TouchableOpacity>
+							<TouchableOpacity onPress={() => setShowModal(false)}><MaterialIcons name="close" size={22} color="#888888" /></TouchableOpacity>
 						</View>
 						<ScrollView showsVerticalScrollIndicator={false}>
 							{[
@@ -108,12 +108,12 @@ const AuthorDashboardScreen = ({ navigation }) => {
 							].map(f => (
 								<View key={f.label} style={s.field}>
 									<Text style={s.fieldLabel}>{f.label}</Text>
-									<TextInput style={s.input} value={f.val} onChangeText={f.set} placeholder={f.ph} placeholderTextColor="#b3b2af" autoCapitalize="none" />
+									<TextInput style={s.input} value={f.val} onChangeText={f.set} placeholder={f.ph} placeholderTextColor="#BBBBBB" autoCapitalize="none" />
 								</View>
 							))}
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Mô tả</Text>
-								<TextInput style={[s.input, { height: 80 }]} value={description} onChangeText={setDescription} placeholder="Tóm tắt nội dung..." placeholderTextColor="#b3b2af" multiline />
+								<TextInput style={[s.input, { height: 80 }]} value={description} onChangeText={setDescription} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
 							</View>
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Thể loại *</Text>
@@ -137,36 +137,36 @@ const AuthorDashboardScreen = ({ navigation }) => {
 };
 
 const s = StyleSheet.create({
-	safe: { flex: 1, backgroundColor: "#fcf9f7" },
-	header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-	headerTitle: { fontSize: 20, fontWeight: "800", color: "#323331" },
-	headerSub: { fontSize: 12, color: "#5f5f5d", marginTop: 2 },
-	btn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#8c4f3b", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-	btnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+	safe: { flex: 1, backgroundColor: "#FFFFFF" },
+	header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	headerTitle: { fontSize: 20, fontWeight: "800", color: "#1A1A1A" },
+	headerSub: { fontSize: 12, color: "#888888", marginTop: 2 },
+	btn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#8B4513", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+	btnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-	emptyText: { fontSize: 14, color: "#5f5f5d" },
-	card: { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "rgba(179,178,175,0.2)", elevation: 2 },
+	emptyText: { fontSize: 14, color: "#888888" },
+	card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "#F0F0F0" },
 	rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
-	cardTitle: { fontSize: 15, fontWeight: "700", color: "#323331", flex: 1 },
+	cardTitle: { fontSize: 15, fontWeight: "700", color: "#1A1A1A", flex: 1 },
 	badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 	badgeText: { fontSize: 10, fontWeight: "700" },
-	cardMeta: { fontSize: 12, color: "#8c4f3b", marginBottom: 10 },
-	chapBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "rgba(140,79,59,0.3)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start" },
-	chapBtnText: { fontSize: 12, color: "#8c4f3b", fontWeight: "600" },
+	cardMeta: { fontSize: 12, color: "#888888", marginBottom: 10 },
+	chapBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "#EBEBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start", backgroundColor: "#F5F5F5" },
+	chapBtnText: { fontSize: 12, color: "#8B4513", fontWeight: "600" },
 	overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-	sheet: { backgroundColor: "#fcf9f7", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
+	sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
 	sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-	sheetTitle: { fontSize: 18, fontWeight: "700", color: "#323331" },
+	sheetTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A1A" },
 	field: { marginBottom: 14 },
-	fieldLabel: { fontSize: 13, fontWeight: "700", color: "#323331", marginBottom: 6 },
-	input: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(179,178,175,0.3)", paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: "#323331" },
+	fieldLabel: { fontSize: 13, fontWeight: "700", color: "#1A1A1A", marginBottom: 6 },
+	input: { backgroundColor: "#F5F5F5", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: "#1A1A1A" },
 	chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-	chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "rgba(140,79,59,0.3)", backgroundColor: "#fff" },
-	chipActive: { backgroundColor: "#8c4f3b", borderColor: "#8c4f3b" },
-	chipText: { fontSize: 12, color: "#8c4f3b", fontWeight: "600" },
-	chipTextActive: { color: "#fff" },
-	submitBtn: { backgroundColor: "#8c4f3b", paddingVertical: 14, borderRadius: 999, alignItems: "center", marginTop: 8 },
-	submitText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+	chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5" },
+	chipActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
+	chipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
+	chipTextActive: { color: "#FFFFFF" },
+	submitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center", marginTop: 8 },
+	submitText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
 
 export default AuthorDashboardScreen;

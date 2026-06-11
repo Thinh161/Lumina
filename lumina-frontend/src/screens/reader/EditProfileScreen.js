@@ -48,7 +48,7 @@ const EditProfileScreen = ({ navigation }) => {
 		<SafeAreaView style={styles.safeArea}>
 			<View style={styles.topBar}>
 				<TouchableOpacity onPress={() => navigation.goBack()}>
-					<MaterialIcons name="arrow-back" size={22} color="#8c4f3b" />
+					<MaterialIcons name="arrow-back" size={22} color="#8B4513" />
 				</TouchableOpacity>
 				<Text style={styles.topBarTitle}>Chỉnh sửa hồ sơ</Text>
 				<View style={{ width: 22 }} />
@@ -64,7 +64,7 @@ const EditProfileScreen = ({ navigation }) => {
 					<TextInput
 						style={styles.input}
 						placeholder="https://..."
-						placeholderTextColor="#b3b2af"
+						placeholderTextColor="#BBBBBB"
 						value={avatar}
 						onChangeText={setAvatar}
 						autoCapitalize="none"
@@ -76,7 +76,7 @@ const EditProfileScreen = ({ navigation }) => {
 					<TextInput
 						style={styles.input}
 						placeholder="Nhập tên của bạn"
-						placeholderTextColor="#b3b2af"
+						placeholderTextColor="#BBBBBB"
 						value={fullName}
 						onChangeText={setFullName}
 					/>
@@ -114,46 +114,46 @@ const EditProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: "#fcf9f7" },
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
 	topBar: {
 		flexDirection: "row", alignItems: "center", justifyContent: "space-between",
 		paddingHorizontal: 16, paddingVertical: 12,
-		borderBottomWidth: 1, borderBottomColor: "rgba(179,178,175,0.2)",
+		borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
 	},
-	topBarTitle: { fontSize: 16, fontWeight: "700", color: "#323331" },
+	topBarTitle: { fontSize: 16, fontWeight: "700", color: "#1A1A1A" },
 	content: { padding: 20, gap: 20 },
 	avatarSection: { alignItems: "center", gap: 10 },
-	avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: "#dca77c" },
-	avatarHint: { fontSize: 12, color: "#5f5f5d" },
+	avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: "#EBEBEB" },
+	avatarHint: { fontSize: 12, color: "#888888" },
 	field: { gap: 6 },
-	label: { fontSize: 13, fontWeight: "700", color: "#323331" },
+	label: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
 	input: {
-		backgroundColor: "#fff",
+		backgroundColor: "#F5F5F5",
 		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.3)",
+		borderColor: "#EBEBEB",
 		paddingHorizontal: 14,
 		paddingVertical: 12,
 		fontSize: 14,
-		color: "#323331",
+		color: "#1A1A1A",
 	},
 	inputDisabled: {
-		backgroundColor: "#f0eeed",
+		backgroundColor: "#F5F5F5",
 		borderRadius: 10,
 		paddingHorizontal: 14,
 		paddingVertical: 12,
 	},
-	inputDisabledText: { fontSize: 14, color: "#8c8c8a" },
-	hint: { fontSize: 11, color: "#b3b2af" },
+	inputDisabledText: { fontSize: 14, color: "#BBBBBB" },
+	hint: { fontSize: 11, color: "#BBBBBB" },
 	saveBtn: {
-		backgroundColor: "#8c4f3b",
+		backgroundColor: "#8B4513",
 		paddingVertical: 14,
 		borderRadius: 999,
 		alignItems: "center",
 		marginTop: 8,
 	},
 	saveBtnDisabled: { opacity: 0.6 },
-	saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+	saveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
 
 export default EditProfileScreen;

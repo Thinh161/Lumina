@@ -57,14 +57,14 @@ const SearchScreen = ({ navigation }) => {
 			<View style={styles.cardInfo}>
 				<Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
 				<Text style={styles.cardAuthor} numberOfLines={1}>
-					<MaterialIcons name="person" size={12} color="#8c4f3b" /> {item.author_name || "Ẩn danh"}
+					<MaterialIcons name="person" size={12} color="#8B4513" /> {item.author_name || "Ẩn danh"}
 				</Text>
 				<View style={styles.cardMeta}>
 					<View style={styles.categoryPill}>
 						<Text style={styles.categoryPillText}>{item.category_name || "Khác"}</Text>
 					</View>
 					<Text style={styles.viewCount}>
-						<MaterialIcons name="visibility" size={12} color="#b3b2af" /> {item.views || 0}
+						<MaterialIcons name="visibility" size={12} color="#BBBBBB" /> {item.views || 0}
 					</Text>
 				</View>
 				<Text style={styles.cardDesc} numberOfLines={2}>{item.description || "Chưa có mô tả."}</Text>
@@ -80,11 +80,11 @@ const SearchScreen = ({ navigation }) => {
 
 			{/* Search bar */}
 			<View style={styles.searchBar}>
-				<MaterialIcons name="search" size={20} color="#8c4f3b" style={{ marginRight: 8 }} />
+				<MaterialIcons name="search" size={20} color="#8B4513" style={{ marginRight: 8 }} />
 				<TextInput
 					style={styles.searchInput}
 					placeholder="Tên truyện, tác giả..."
-					placeholderTextColor="#b3b2af"
+					placeholderTextColor="#BBBBBB"
 					value={query}
 					onChangeText={setQuery}
 					onSubmitEditing={doSearch}
@@ -92,7 +92,7 @@ const SearchScreen = ({ navigation }) => {
 				/>
 				{query.length > 0 && (
 					<TouchableOpacity onPress={() => { setQuery(''); setResults([]); setSearched(false); }}>
-						<MaterialIcons name="close" size={18} color="#b3b2af" />
+						<MaterialIcons name="close" size={18} color="#BBBBBB" />
 					</TouchableOpacity>
 				)}
 			</View>
@@ -121,16 +121,16 @@ const SearchScreen = ({ navigation }) => {
 			{/* Results */}
 			{loading ? (
 				<View style={styles.center}>
-					<ActivityIndicator size="large" color="#dca77c" />
+					<ActivityIndicator size="large" color="#8B4513" />
 				</View>
 			) : searched && results.length === 0 ? (
 				<View style={styles.center}>
-					<MaterialIcons name="search-off" size={48} color="#dca77c" />
+					<MaterialIcons name="search-off" size={48} color="#DDDDDD" />
 					<Text style={styles.emptyText}>Không tìm thấy truyện nào.</Text>
 				</View>
 			) : !searched ? (
 				<View style={styles.center}>
-					<MaterialIcons name="auto-stories" size={52} color="#dca77c" />
+					<MaterialIcons name="auto-stories" size={52} color="#DDDDDD" />
 					<Text style={styles.emptyText}>Nhập tên truyện hoặc chọn thể loại để tìm.</Text>
 				</View>
 			) : (
@@ -147,28 +147,23 @@ const SearchScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: "#fcf9f7" },
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
 	header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-	headerTitle: { fontSize: 22, fontWeight: "800", color: "#323331", letterSpacing: 0.5 },
+	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
 
 	searchBar: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: "#fff",
+		backgroundColor: "#F5F5F5",
 		marginHorizontal: 16,
 		marginBottom: 12,
 		paddingHorizontal: 14,
 		paddingVertical: 10,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.3)",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.06,
-		shadowRadius: 4,
-		elevation: 2,
+		borderColor: "#EBEBEB",
 	},
-	searchInput: { flex: 1, fontSize: 14, color: "#323331" },
+	searchInput: { flex: 1, fontSize: 14, color: "#1A1A1A" },
 
 	chipRow: {
 		flexDirection: "row",
@@ -182,45 +177,40 @@ const styles = StyleSheet.create({
 		paddingVertical: 6,
 		borderRadius: 999,
 		borderWidth: 1,
-		borderColor: "rgba(140,79,59,0.3)",
-		backgroundColor: "#fff",
+		borderColor: "#EBEBEB",
+		backgroundColor: "#F5F5F5",
 	},
-	chipActive: { backgroundColor: "#8c4f3b", borderColor: "#8c4f3b" },
-	chipText: { fontSize: 12, color: "#8c4f3b", fontWeight: "600" },
-	chipTextActive: { color: "#fff" },
+	chipActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
+	chipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
+	chipTextActive: { color: "#FFFFFF" },
 
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-	emptyText: { fontSize: 14, color: "#8c4f3b", textAlign: "center", paddingHorizontal: 32 },
+	emptyText: { fontSize: 14, color: "#888888", textAlign: "center", paddingHorizontal: 32 },
 
 	list: { paddingHorizontal: 16, paddingBottom: 24 },
 	card: {
 		flexDirection: "row",
-		backgroundColor: "#fff",
+		backgroundColor: "#FFFFFF",
 		borderRadius: 12,
 		marginBottom: 12,
 		overflow: "hidden",
 		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.2)",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		borderColor: "#F0F0F0",
 	},
 	cardCover: { width: 80, height: 110 },
 	cardInfo: { flex: 1, padding: 12, justifyContent: "space-between" },
-	cardTitle: { fontSize: 14, fontWeight: "700", color: "#323331", lineHeight: 20 },
-	cardAuthor: { fontSize: 12, color: "#8c4f3b", marginTop: 2 },
+	cardTitle: { fontSize: 14, fontWeight: "700", color: "#1A1A1A", lineHeight: 20 },
+	cardAuthor: { fontSize: 12, color: "#8B4513", marginTop: 2 },
 	cardMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
 	categoryPill: {
-		backgroundColor: "rgba(140,79,59,0.1)",
+		backgroundColor: "#F2E8E3",
 		paddingHorizontal: 8,
 		paddingVertical: 2,
 		borderRadius: 999,
 	},
-	categoryPillText: { fontSize: 10, color: "#8c4f3b", fontWeight: "600" },
-	viewCount: { fontSize: 11, color: "#b3b2af" },
-	cardDesc: { fontSize: 11, color: "#5f5f5d", lineHeight: 16, marginTop: 4 },
+	categoryPillText: { fontSize: 10, color: "#8B4513", fontWeight: "600" },
+	viewCount: { fontSize: 11, color: "#BBBBBB" },
+	cardDesc: { fontSize: 11, color: "#888888", lineHeight: 16, marginTop: 4 },
 });
 
 export default SearchScreen;

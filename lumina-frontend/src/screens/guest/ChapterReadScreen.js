@@ -31,7 +31,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	if (loading || !currentChapterContent) {
 		return (
 			<SafeAreaView style={[styles.safeArea, { justifyContent: "center", alignItems: "center" }]}>
-				<ActivityIndicator size="large" color="#dca77c" />
+				<ActivityIndicator size="large" color="#8B4513" />
 			</SafeAreaView>
 		);
 	}
@@ -50,12 +50,12 @@ const ChapterReadScreen = ({ navigation, route }) => {
 						style={styles.iconButton}
 						onPress={() => navigation.goBack()}
 					>
-						<MaterialIcons name="arrow-back" size={20} color="#5f5f5d" />
+						<MaterialIcons name="arrow-back" size={20} color="#888888" />
 					</TouchableOpacity>
 
 					<View style={styles.toolbarGroup}>
 						<TouchableOpacity style={styles.toolbarIcon}>
-							<MaterialIcons name="format-size" size={18} color="#5f5f5d" />
+							<MaterialIcons name="format-size" size={18} color="#888888" />
 						</TouchableOpacity>
 						<View style={styles.toolbarDivider} />
 						<View style={styles.paletteRow}>
@@ -118,7 +118,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 										<MaterialIcons
 											name="keyboard-arrow-down"
 											size={24}
-											color="#8c4f3b"
+											color="#8B4513"
 										/>
 									</View>
 								</TouchableOpacity>
@@ -134,10 +134,10 @@ const ChapterReadScreen = ({ navigation, route }) => {
 					</View>
 					<View style={styles.progressActions}>
 						<TouchableOpacity>
-							<MaterialIcons name="bookmark" size={20} color="#5f5f5d" />
+							<MaterialIcons name="bookmark" size={20} color="#888888" />
 						</TouchableOpacity>
 						<TouchableOpacity>
-							<MaterialIcons name="list-alt" size={20} color="#5f5f5d" />
+							<MaterialIcons name="list-alt" size={20} color="#888888" />
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -149,7 +149,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
-		backgroundColor: "#fcf9f7",
+		backgroundColor: "#FFFFFF",
 	},
 	root: {
 		flex: 1,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
 		width: 40,
 		height: 40,
 		borderRadius: 20,
-		backgroundColor: "rgba(246, 243, 241, 0.85)",
+		backgroundColor: "rgba(245, 245, 245, 0.95)",
 		alignItems: "center",
 		justifyContent: "center",
 	},
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 		paddingVertical: 6,
 		borderRadius: 999,
-		backgroundColor: "rgba(246, 243, 241, 0.85)",
+		backgroundColor: "rgba(245, 245, 245, 0.95)",
 	},
 	toolbarIcon: {
 		padding: 4,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
 	toolbarDivider: {
 		width: 1,
 		height: 16,
-		backgroundColor: "rgba(179, 178, 175, 0.4)",
+		backgroundColor: "#EBEBEB",
 		marginHorizontal: 8,
 	},
 	paletteRow: {
@@ -201,16 +201,16 @@ const styles = StyleSheet.create({
 		height: 18,
 		borderRadius: 9,
 		borderWidth: 1,
-		borderColor: "rgba(179, 178, 175, 0.4)",
+		borderColor: "#EBEBEB",
 	},
 	paletteLight: {
-		backgroundColor: "#fcf9f7",
+		backgroundColor: "#F5F5F5",
 	},
 	paletteSepia: {
-		backgroundColor: "#f4ebd0",
+		backgroundColor: "#F5E6C8",
 	},
 	paletteDark: {
-		backgroundColor: "#323331",
+		backgroundColor: "#1A1A1A",
 	},
 	scrollContent: {
 		paddingTop: 72,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 		letterSpacing: 3,
 		textTransform: "uppercase",
-		color: "#8c4f3b",
+		color: "#8B4513",
 		marginBottom: 12,
 	},
 	chapterTitle: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 		fontStyle: "italic",
 		textAlign: "center",
-		color: "#323331",
+		color: "#1A1A1A",
 		marginBottom: 12,
 	},
 	chapterStats: {
@@ -252,19 +252,19 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 		letterSpacing: 2,
 		textTransform: "uppercase",
-		color: "#5f5f5d",
+		color: "#888888",
 	},
 	dot: {
 		width: 4,
 		height: 4,
 		borderRadius: 2,
-		backgroundColor: "#b3b2af",
+		backgroundColor: "#EBEBEB",
 	},
 	heroImageWrap: {
 		borderRadius: 16,
 		overflow: "hidden",
 		marginBottom: 24,
-		backgroundColor: "#f6f3f1",
+		backgroundColor: "#F5F5F5",
 	},
 	heroImage: {
 		width: "100%",
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
 		right: 0,
 		top: 0,
 		bottom: 0,
-		backgroundColor: "rgba(252, 249, 247, 0.12)",
+		backgroundColor: "rgba(255, 255, 255, 0.05)",
 	},
 	article: {
 		gap: 18,
@@ -288,31 +288,31 @@ const styles = StyleSheet.create({
 	dropCap: {
 		fontSize: 46,
 		fontWeight: "700",
-		color: "#8c4f3b",
+		color: "#8B4513",
 		lineHeight: 52,
 	},
 	paragraphFirst: {
 		flex: 1,
 		fontSize: 16,
 		lineHeight: 26,
-		color: "#3f403e",
+		color: "#1A1A1A",
 	},
 	paragraph: {
 		fontSize: 16,
 		lineHeight: 26,
-		color: "#3f403e",
+		color: "#1A1A1A",
 	},
 	quoteBlock: {
 		padding: 16,
 		borderLeftWidth: 2,
-		borderLeftColor: "rgba(140, 79, 59, 0.3)",
-		backgroundColor: "rgba(246, 243, 241, 0.6)",
+		borderLeftColor: "rgba(139, 69, 19, 0.2)",
+		backgroundColor: "#F5F5F5",
 		borderRadius: 12,
 	},
 	quoteText: {
 		fontSize: 18,
 		fontStyle: "italic",
-		color: "#5f5f5d",
+		color: "#888888",
 		lineHeight: 26,
 	},
 	splitRow: {
@@ -344,13 +344,13 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 		letterSpacing: 2,
 		textTransform: "uppercase",
-		color: "#5f5f5d",
+		color: "#888888",
 	},
 	nextTitle: {
 		fontSize: 20,
 		fontWeight: "700",
 		fontStyle: "italic",
-		color: "#323331",
+		color: "#1A1A1A",
 		textAlign: "center",
 	},
 	nextIconWrap: {
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
 		height: 44,
 		borderRadius: 22,
 		borderWidth: 1,
-		borderColor: "rgba(179, 178, 175, 0.4)",
+		borderColor: "#EBEBEB",
 		alignItems: "center",
 		justifyContent: "center",
 		marginTop: 4,
@@ -371,30 +371,30 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 12,
-		backgroundColor: "rgba(246, 243, 241, 0.9)",
+		backgroundColor: "rgba(255, 255, 255, 0.95)",
 		borderRadius: 999,
 		paddingVertical: 10,
 		paddingHorizontal: 14,
 		borderWidth: 1,
-		borderColor: "rgba(179, 178, 175, 0.2)",
+		borderColor: "#EBEBEB",
 	},
 	progressLabel: {
 		fontSize: 10,
 		fontWeight: "700",
-		color: "#5f5f5d",
+		color: "#888888",
 		width: 36,
 	},
 	progressTrack: {
 		flex: 1,
 		height: 4,
 		borderRadius: 999,
-		backgroundColor: "rgba(179, 178, 175, 0.3)",
+		backgroundColor: "#EBEBEB",
 		overflow: "hidden",
 	},
 	progressFill: {
 		width: "45%",
 		height: "100%",
-		backgroundColor: "#8c4f3b",
+		backgroundColor: "#8B4513",
 	},
 	progressActions: {
 		flexDirection: "row",

@@ -56,7 +56,7 @@ const LibraryScreen = ({ navigation }) => {
 				style={styles.removeBtn}
 				onPress={() => handleRemove(item.id, item.title)}
 			>
-				<MaterialIcons name="bookmark-remove" size={22} color="#8c4f3b" />
+				<MaterialIcons name="bookmark-remove" size={22} color="#8B4513" />
 			</TouchableOpacity>
 		</TouchableOpacity>
 	);
@@ -70,11 +70,11 @@ const LibraryScreen = ({ navigation }) => {
 
 			{loading ? (
 				<View style={styles.center}>
-					<ActivityIndicator size="large" color="#dca77c" />
+					<ActivityIndicator size="large" color="#8B4513" />
 				</View>
 			) : items.length === 0 ? (
 				<View style={styles.center}>
-					<MaterialIcons name="auto-stories" size={56} color="#dca77c" />
+					<MaterialIcons name="auto-stories" size={56} color="#DDDDDD" />
 					<Text style={styles.emptyTitle}>Thư viện trống</Text>
 					<Text style={styles.emptyDesc}>Thêm truyện bạn yêu thích vào đây để đọc sau.</Text>
 					<TouchableOpacity
@@ -98,52 +98,47 @@ const LibraryScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: "#fcf9f7" },
-	header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-	headerTitle: { fontSize: 22, fontWeight: "800", color: "#323331" },
-	headerSub: { fontSize: 12, color: "#8c4f3b", marginTop: 2 },
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+	header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
+	headerSub: { fontSize: 12, color: "#888888", marginTop: 2 },
 
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-	emptyTitle: { fontSize: 16, fontWeight: "700", color: "#323331" },
-	emptyDesc: { fontSize: 13, color: "#5f5f5d", textAlign: "center", paddingHorizontal: 40 },
+	emptyTitle: { fontSize: 16, fontWeight: "700", color: "#1A1A1A" },
+	emptyDesc: { fontSize: 13, color: "#888888", textAlign: "center", paddingHorizontal: 40 },
 	browseBtn: {
 		marginTop: 8,
-		backgroundColor: "#8c4f3b",
+		backgroundColor: "#8B4513",
 		paddingHorizontal: 24,
 		paddingVertical: 10,
 		borderRadius: 999,
 	},
-	browseBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+	browseBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
 
-	list: { paddingHorizontal: 16, paddingBottom: 24 },
+	list: { paddingHorizontal: 16, paddingBottom: 24, paddingTop: 12 },
 	card: {
 		flexDirection: "row",
-		backgroundColor: "#fff",
+		backgroundColor: "#FFFFFF",
 		borderRadius: 12,
 		marginBottom: 12,
 		overflow: "hidden",
 		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.2)",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		borderColor: "#F0F0F0",
 	},
 	cover: { width: 80, height: 110 },
 	info: { flex: 1, padding: 12, justifyContent: "space-between" },
-	title: { fontSize: 14, fontWeight: "700", color: "#323331", lineHeight: 20 },
-	author: { fontSize: 12, color: "#8c4f3b", marginTop: 2 },
+	title: { fontSize: 14, fontWeight: "700", color: "#1A1A1A", lineHeight: 20 },
+	author: { fontSize: 12, color: "#8B4513", marginTop: 2 },
 	categoryPill: {
 		alignSelf: "flex-start",
-		backgroundColor: "rgba(140,79,59,0.1)",
+		backgroundColor: "#F2E8E3",
 		paddingHorizontal: 8,
 		paddingVertical: 2,
 		borderRadius: 999,
 		marginTop: 4,
 	},
-	categoryText: { fontSize: 10, color: "#8c4f3b", fontWeight: "600" },
-	addedAt: { fontSize: 10, color: "#b3b2af", marginTop: 4 },
+	categoryText: { fontSize: 10, color: "#8B4513", fontWeight: "600" },
+	addedAt: { fontSize: 10, color: "#BBBBBB", marginTop: 4 },
 	removeBtn: { padding: 12, justifyContent: "center" },
 });
 
