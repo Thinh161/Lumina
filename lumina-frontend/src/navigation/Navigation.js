@@ -13,6 +13,7 @@ import ChapterReadScreen from "../screens/guest/ChapterReadScreen";
 import ForgotPasswordScreen from "../screens/guest/ForgotPasswordScreen";
 import SearchScreen from "../screens/guest/SearchScreen";
 import UserNavigation from "./UserNavigation";
+import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -132,6 +133,7 @@ const Navigation = () => {
 				<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 				<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
 				<Stack.Screen name="Reader" component={UserNavigation} />
+				<Stack.Screen name="Admin" component={AdminDashboardScreen} />
 			</Stack.Navigator>
 		</NavigationContainer>
 	);

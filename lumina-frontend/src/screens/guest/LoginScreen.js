@@ -15,7 +15,7 @@ const LoginScreen = ({ navigation }) => {
 	const [showPass, setShowPass] = useState(false);
 
 	useEffect(() => {
-		if (user) { navigation.replace("Reader"); }
+		if (user) { navigation.replace(user.role_id === 1 ? "Admin" : "Reader"); }
 	}, [user, navigation]);
 
 	useEffect(() => {

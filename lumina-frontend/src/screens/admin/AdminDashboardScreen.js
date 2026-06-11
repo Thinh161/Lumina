@@ -5,10 +5,13 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
+import { useDispatch } from 'react-redux';
+import { logout } from '../../redux_thunk/AuthSlice';
 import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const AdminDashboardScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
 	const [tab, setTab] = useState('stories');
 	const [storyFilter, setStoryFilter] = useState('pending'); // pending | published | rejected
 	const [pendingStories, setPendingStories] = useState([]);
@@ -302,6 +305,15 @@ const AdminDashboardScreen = ({ navigation }) => {
 		<SafeAreaView style={s.safe}>
 			<View style={s.header}>
 				<Text style={s.headerTitle}>Admin Dashboard</Text>
+				<TouchableOpacity
+					style={s.logoutBtn}
+					onPress={() => Alert.alert("Đăng xuất", "Bạn muốn đăng xuất?", [
+						{ text: "Hủy", style: "cancel" },
+						{ text: "Đăng xuất", style: "destructive", onPress: () => { dispatch(logout()); navigation.replace("Guest"); } }
+					])}
+				>
+					<MaterialIcons name="logout" size={20} color="#D32F2F" />
+				</TouchableOpacity>
 			</View>
 
 			<View style={s.tabRow}>
@@ -378,8 +390,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 
 const s = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: "#FFFFFF" },
-	header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
+	logoutBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFF0F0", alignItems: "center", justifyContent: "center" },
 	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginVertical: 10 },
 	tabBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
 	tabBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
