@@ -10,6 +10,8 @@ import { API_URL } from '../../config/api';
 const NOTIF_ICONS = {
 	story_approved: { name: 'check-circle', color: '#2E7D32' },
 	story_rejected: { name: 'cancel', color: '#D32F2F' },
+	author_approved: { name: 'verified-user', color: '#2E7D32' },
+	author_rejected: { name: 'block', color: '#D32F2F' },
 };
 
 const NotificationsScreen = ({ navigation }) => {

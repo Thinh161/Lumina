@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
 	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Image
@@ -252,6 +252,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 						<ScrollView showsVerticalScrollIndicator={false}>
 							{[
 								{ label: "Tên truyện *", val: stTitle, set: setStTitle, ph: "Tên truyện..." },
+								{ label: "URL ảnh bìa", val: stThumb, set: setStThumb, ph: "https://..." },
 							].map(f => (
 								<View key={f.label} style={s.field}>
 									<Text style={s.fieldLabel}>{f.label}</Text>

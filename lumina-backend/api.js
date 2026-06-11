@@ -538,6 +538,10 @@ app.put('/api/admin/users/:id/approve-author', (req, res) => {
     const { id } = req.params;
     con.query(`UPDATE users SET role_id = 2, author_request = 0 WHERE id = ?`, [id], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
+        con.query(
+            `INSERT INTO notifications (user_id, type, message) VALUES (?, 'author_approved', 'Yêu cầu trở thành tác giả của bạn đã được chấp thuận! Bạn có thể đăng truyện ngay bây giờ.')`,
+            [id], (e2) => { if (e2) console.log('notif insert:', e2.message); }
+        );
         res.json({ status: "success" });
     });
 });
@@ -547,6 +551,10 @@ app.put('/api/admin/users/:id/reject-author', (req, res) => {
     const { id } = req.params;
     con.query(`UPDATE users SET author_request = 0 WHERE id = ?`, [id], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
+        con.query(
+            `INSERT INTO notifications (user_id, type, message) VALUES (?, 'author_rejected', 'Yêu cầu trở thành tác giả của bạn đã bị từ chối. Vui lòng liên hệ Admin để biết thêm chi tiết.')`,
+            [id], (e2) => { if (e2) console.log('notif insert:', e2.message); }
+        );
         res.json({ status: "success" });
     });
 });

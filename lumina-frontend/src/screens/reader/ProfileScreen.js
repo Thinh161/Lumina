@@ -30,6 +30,7 @@ const ProfileScreen = ({ navigation }) => {
 	const [showTopup, setShowTopup] = useState(false);
 	const [topupAmount, setTopupAmount] = useState('');
 	const [topupLoading, setTopupLoading] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
 
 	const isReader = user?.role_id === 4;
 
@@ -39,7 +40,10 @@ const ProfileScreen = ({ navigation }) => {
 		{ id: "m-history", title: "Lịch sử đọc", subtitle: "Xem lại những chương đã đọc", icon: "history", screen: "ReadingHistory" },
 		...(isReader && !user?.author_request ? [{ id: "m-become-author", title: "Trở thành tác giả", subtitle: "Gửi yêu cầu lên Admin", icon: "create", action: "requestAuthor" }] : []),
 		...(isReader && user?.author_request ? [{ id: "m-pending-author", title: "Đang chờ duyệt", subtitle: "Yêu cầu tác giả đang được Admin xem xét", icon: "hourglass-empty", action: null }] : []),
-		...(isAuthor ? [{ id: "m-author", title: "Quản lý truyện", subtitle: "Đăng truyện mới, thêm chương", icon: "edit-note", screen: "AuthorDashboard" }] : []),
+		...(isAuthor ? [
+			{ id: "m-author", title: "Quản lý truyện", subtitle: "Đăng truyện mới, thêm chương", icon: "edit-note", screen: "AuthorDashboard" },
+			{ id: "m-notifications", title: "Thông báo", subtitle: unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : "Xem thông báo từ Admin", icon: "notifications", screen: "Notifications", badge: unreadCount > 0 ? unreadCount : null },
+		] : []),
 		...(isAdmin ? [{ id: "m-admin", title: "Admin Dashboard", subtitle: "Kiểm duyệt truyện, quản lý user", icon: "admin-panel-settings", screen: "AdminDashboard" }] : []),
 	];
 
@@ -47,6 +51,12 @@ const ProfileScreen = ({ navigation }) => {
 		if (user?.id) {
 			dispatch(fetchUserProfile(user.id));
 			dispatch(fetchLibrary(user.id));
+			if (user.role_id === 2) {
+				fetch(`${API_URL}/notifications/${user.id}/unread-count`)
+					.then(r => r.json())
+					.then(res => setUnreadCount(res.count || 0))
+					.catch(() => {});
+			}
 		}
 	}, [dispatch, user?.id]);
 
@@ -232,10 +242,15 @@ const ProfileScreen = ({ navigation }) => {
 										<View style={styles.managementLeft}>
 											<View style={styles.managementIconWrap}>
 												<MaterialIcons name={item.icon} size={18} color="#8B4513" />
+												{item.badge ? (
+													<View style={styles.mgmtBadge}>
+														<Text style={styles.mgmtBadgeText}>{item.badge > 99 ? '99+' : item.badge}</Text>
+													</View>
+												) : null}
 											</View>
 											<View>
 												<Text style={styles.managementItemTitle}>{item.title}</Text>
-												<Text style={styles.managementItemSubtitle}>{item.subtitle}</Text>
+												<Text style={[styles.managementItemSubtitle, item.badge && { color: '#8B4513' }]}>{item.subtitle}</Text>
 											</View>
 										</View>
 										<MaterialIcons name="chevron-right" size={20} color="#BBBBBB" />
@@ -335,6 +350,8 @@ const styles = StyleSheet.create({
 	managementRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	managementLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
 	managementIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+	mgmtBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#D32F2F', borderRadius: 999, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+	mgmtBadgeText: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' },
 	managementItemTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
 	managementItemSubtitle: { fontSize: 10, color: "#888888", marginTop: 2 },
 	logoutRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12 },
