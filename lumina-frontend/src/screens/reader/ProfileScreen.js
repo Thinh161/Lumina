@@ -92,10 +92,7 @@ const ProfileScreen = ({ navigation }) => {
 				body: JSON.stringify({ user_id: user.id, amount_vnd: selectedPkg.vnd, amount_xu: selectedPkg.xu }),
 			}).then(r => r.json());
 			if (res.status === 'success') {
-				setShowTopup(false);
-				setTopupStep(1);
-				setSelectedPkg(null);
-				Alert.alert("Đã ghi nhận", "Admin sẽ kiểm tra chuyển khoản và cộng xu cho bạn trong vài phút.");
+				setTopupStep(3);
 			} else {
 				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
 			}
@@ -280,10 +277,14 @@ const ProfileScreen = ({ navigation }) => {
 				<View style={styles.overlay}>
 					<View style={styles.sheet}>
 						<View style={styles.sheetHeader}>
-							<Text style={styles.sheetTitle}>{topupStep === 1 ? 'Chọn gói nạp xu' : 'Thông tin chuyển khoản'}</Text>
-							<TouchableOpacity onPress={() => { setShowTopup(false); setTopupStep(1); setSelectedPkg(null); }}>
-								<MaterialIcons name="close" size={22} color="#888888" />
-							</TouchableOpacity>
+							<Text style={styles.sheetTitle}>
+							{topupStep === 1 ? 'Chọn gói nạp xu' : topupStep === 2 ? 'Thông tin chuyển khoản' : 'Đang chờ xác nhận'}
+						</Text>
+							{topupStep !== 3 && (
+								<TouchableOpacity onPress={() => { setShowTopup(false); setTopupStep(1); setSelectedPkg(null); }}>
+									<MaterialIcons name="close" size={22} color="#888888" />
+								</TouchableOpacity>
+							)}
 						</View>
 
 						{topupStep === 1 ? (
@@ -344,6 +345,21 @@ const ProfileScreen = ({ navigation }) => {
 									<Text style={styles.backStepText}>Chọn lại gói khác</Text>
 								</TouchableOpacity>
 							</>
+						) : (
+							<View style={styles.waitingBox}>
+								<ActivityIndicator size="large" color="#8B4513" />
+								<Text style={styles.waitingTitle}>Yêu cầu đã được gửi!</Text>
+								<Text style={styles.waitingDesc}>
+									Admin sẽ kiểm tra chuyển khoản và cộng <Text style={{ fontWeight: '800', color: '#8B4513' }}>{selectedPkg?.xu} xu</Text> vào tài khoản của bạn trong vài phút.
+								</Text>
+								<Text style={styles.waitingHint}>Bạn sẽ nhận được thông báo khi xu được cộng.</Text>
+								<TouchableOpacity
+									style={[styles.topupSubmitBtn, { marginTop: 8 }]}
+									onPress={() => { setShowTopup(false); setTopupStep(1); setSelectedPkg(null); }}
+								>
+									<Text style={styles.topupSubmitText}>Đóng</Text>
+								</TouchableOpacity>
+							</View>
 						)}
 					</View>
 				</View>
@@ -424,6 +440,10 @@ const styles = StyleSheet.create({
 	transferHint: { fontSize: 12, color: "#888888", lineHeight: 18, textAlign: "center" },
 	backStepBtn: { alignItems: "center", paddingVertical: 8 },
 	backStepText: { fontSize: 13, color: "#8B4513", fontWeight: "600" },
+	waitingBox: { alignItems: "center", gap: 12, paddingVertical: 8 },
+	waitingTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A1A" },
+	waitingDesc: { fontSize: 14, color: "#444444", lineHeight: 22, textAlign: "center" },
+	waitingHint: { fontSize: 12, color: "#AAAAAA", textAlign: "center" },
 });
 
 export default ProfileScreen;
