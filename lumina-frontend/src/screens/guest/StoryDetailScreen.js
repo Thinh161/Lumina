@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -7,30 +7,71 @@ import {
 	ScrollView,
 	Image,
 	TouchableOpacity,
-	ActivityIndicator
+	ActivityIndicator,
+	Alert,
+	TextInput,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStoryDetails, fetchChapters, clearCurrentStory } from "../../redux_thunk/StorySlice";
+import { addToLibrary, removeFromLibrary, fetchLibrary } from "../../redux_thunk/LibrarySlice";
 
+const API_URL = 'http://10.106.42.58:5555/api';
 const DEFAULT_STORY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBvQzYRtYjISxgN15SaT96ZzRp0uhBsLi8dtlvBxtguAe6xQdLmGTT2DPmYgyXdBP9vHMV4o_Y-0WGc0cf6j7bsZDbN4nbabvlvhk20QmITP7ODv5EnXRTGOfvT6ng5cYr2q7IczdQCFVBcnqUent2OjsU41hp7ym-gHYBYq3eBKXIb7MKUQvkoAZctRNEzkIKwQl2okLEZv0nlLr7XzWyP7sNX8e_kGu814cdSoyr5V2dMljfbJGiav9so7PC7k4udoHlX6nakoD8";
 
 const StoryDetailScreen = ({ navigation, route }) => {
 	const { storyId } = route.params || {};
 	const dispatch = useDispatch();
 	const { currentStory, currentChapters, loading } = useSelector(state => state.story);
+	const { user } = useSelector(state => state.auth);
+	const { items: libraryItems } = useSelector(state => state.library);
+	const [libraryLoading, setLibraryLoading] = useState(false);
+
+	const isInLibrary = libraryItems.some(item => item.id === storyId);
+
+	// Comments
+	const [comments, setComments] = useState([]);
+	const [commentText, setCommentText] = useState('');
+	const [rating, setRating] = useState(5);
+	const [postingComment, setPostingComment] = useState(false);
+
+	const loadComments = useCallback(async () => {
+		if (!storyId) return;
+		try {
+			const data = await fetch(`${API_URL}/stories/${storyId}/comments`).then(r => r.json());
+			if (data.status === "success") setComments(data.data);
+		} catch {}
+	}, [storyId]);
+
+	const handlePostComment = async () => {
+		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để bình luận."); return; }
+		if (!commentText.trim()) return;
+		setPostingComment(true);
+		try {
+			const res = await fetch(`${API_URL}/comments`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ user_id: user.id, story_id: storyId, content: commentText.trim(), rating }),
+			}).then(r => r.json());
+			if (res.status === "success") {
+				setCommentText('');
+				loadComments();
+			}
+		} finally { setPostingComment(false); }
+	};
 
 	useEffect(() => {
 		if (storyId) {
 			dispatch(fetchStoryDetails(storyId));
 			dispatch(fetchChapters(storyId));
+			loadComments();
 		}
 		
 		// Clean up khi rời khỏi trang màn hình
 		return () => {
 			dispatch(clearCurrentStory());
 		};
-	}, [dispatch, storyId]);
+	}, [dispatch, storyId, loadComments]);
 
 	if (loading || !currentStory) {
 		return (
@@ -109,9 +150,35 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<MaterialIcons name="menu-book" size={18} color="#fff7f5" />
 							<Text style={styles.actionPrimaryText}>Đọc Ngay</Text>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.actionButtonGhost}>
-							<MaterialIcons name="bookmark" size={18} color="#323331" />
-							<Text style={styles.actionGhostText}>Đánh Dấu</Text>
+						<TouchableOpacity
+							style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
+							disabled={libraryLoading}
+							onPress={async () => {
+								if (!user) {
+									Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện vào thư viện.");
+									return;
+								}
+								setLibraryLoading(true);
+								try {
+									if (isInLibrary) {
+										await dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+									} else {
+										await dispatch(addToLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+										dispatch(fetchLibrary(user.id));
+									}
+								} finally {
+									setLibraryLoading(false);
+								}
+							}}
+						>
+							<MaterialIcons
+								name={isInLibrary ? "bookmark" : "bookmark-border"}
+								size={18}
+								color={isInLibrary ? "#8c4f3b" : "#323331"}
+							/>
+							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8c4f3b" }]}>
+								{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
+							</Text>
 						</TouchableOpacity>
 					</View>
 
@@ -186,6 +253,72 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<TouchableOpacity style={styles.viewAllButton}>
 								<Text style={styles.viewAllText}>Xem Tất Cả Chương</Text>
 							</TouchableOpacity>
+						</View>
+
+						{/* === BÌNH LUẬN === */}
+						<View style={styles.commentsSection}>
+							<View style={styles.sectionHeader}>
+								<Text style={styles.sectionTitle}>Bình Luận</Text>
+								<Text style={styles.chapterCount}>{comments.length}</Text>
+							</View>
+
+							{/* Nhập bình luận */}
+							<View style={styles.commentInputWrap}>
+								<View style={styles.starRow}>
+									{[1,2,3,4,5].map(n => (
+										<TouchableOpacity key={n} onPress={() => setRating(n)}>
+											<MaterialIcons name={n <= rating ? "star" : "star-border"} size={22} color="#dca77c" />
+										</TouchableOpacity>
+									))}
+									<Text style={styles.ratingLabel}>{rating}/5</Text>
+								</View>
+								<View style={styles.commentRow}>
+									<TextInput
+										style={styles.commentInput}
+										placeholder={user ? "Viết bình luận..." : "Đăng nhập để bình luận"}
+										placeholderTextColor="#b3b2af"
+										value={commentText}
+										onChangeText={setCommentText}
+										editable={!!user}
+										multiline
+									/>
+									<TouchableOpacity
+										style={[styles.sendBtn, (!commentText.trim() || postingComment) && styles.sendBtnDisabled]}
+										onPress={handlePostComment}
+										disabled={!commentText.trim() || postingComment}
+									>
+										{postingComment
+											? <ActivityIndicator size="small" color="#fff" />
+											: <MaterialIcons name="send" size={18} color="#fff" />
+										}
+									</TouchableOpacity>
+								</View>
+							</View>
+
+							{/* Danh sách bình luận */}
+							{comments.length === 0 ? (
+								<Text style={styles.noComments}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
+							) : (
+								comments.map(c => (
+									<View key={c.id} style={styles.commentItem}>
+										<Image source={{ uri: c.avatar || "https://i.pravatar.cc/150?img=5" }} style={styles.commentAvatar} />
+										<View style={styles.commentBody}>
+											<View style={styles.commentTop}>
+												<Text style={styles.commentName}>{c.full_name || c.username}</Text>
+												{c.rating && (
+													<View style={styles.commentRatingRow}>
+														{Array.from({ length: c.rating }).map((_, i) => (
+															<MaterialIcons key={i} name="star" size={11} color="#dca77c" />
+														))}
+													</View>
+												)}
+											</View>
+											<Text style={styles.commentText}>{c.content}</Text>
+											<Text style={styles.commentTime}>{new Date(c.created_at).toLocaleDateString("vi-VN")}</Text>
+										</View>
+									</View>
+								))
+							)}
 						</View>
 					</View>
 				</ScrollView>
@@ -366,6 +499,10 @@ const styles = StyleSheet.create({
 		borderColor: "rgba(179, 178, 175, 0.3)",
 		backgroundColor: "#e4e2df",
 	},
+	actionButtonSaved: {
+		borderColor: "rgba(140,79,59,0.4)",
+		backgroundColor: "rgba(140,79,59,0.08)",
+	},
 	actionGhostText: {
 		color: "#323331",
 		fontSize: 12,
@@ -470,6 +607,36 @@ const styles = StyleSheet.create({
 		color: "#8c4f3b",
 		textAlign: "center",
 	},
+	commentsSection: {
+		marginTop: 8,
+		backgroundColor: "#fff",
+		borderRadius: 16,
+		padding: 16,
+		gap: 12,
+	},
+	commentInputWrap: { gap: 8 },
+	starRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+	ratingLabel: { fontSize: 12, color: "#8c4f3b", marginLeft: 4, fontWeight: "700" },
+	commentRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
+	commentInput: {
+		flex: 1, backgroundColor: "#f6f3f1", borderRadius: 10,
+		paddingHorizontal: 12, paddingVertical: 8, fontSize: 13,
+		color: "#323331", maxHeight: 80,
+	},
+	sendBtn: {
+		backgroundColor: "#8c4f3b", borderRadius: 999,
+		width: 38, height: 38, alignItems: "center", justifyContent: "center",
+	},
+	sendBtnDisabled: { opacity: 0.4 },
+	noComments: { fontSize: 13, color: "#b3b2af", textAlign: "center", paddingVertical: 12 },
+	commentItem: { flexDirection: "row", gap: 10 },
+	commentAvatar: { width: 36, height: 36, borderRadius: 18, marginTop: 2 },
+	commentBody: { flex: 1, gap: 3 },
+	commentTop: { flexDirection: "row", alignItems: "center", gap: 6 },
+	commentName: { fontSize: 13, fontWeight: "700", color: "#323331" },
+	commentRatingRow: { flexDirection: "row" },
+	commentText: { fontSize: 13, color: "#5f5f5d", lineHeight: 18 },
+	commentTime: { fontSize: 10, color: "#b3b2af" },
 	miniPlayer: {
 		position: "absolute",
 		right: 16,
