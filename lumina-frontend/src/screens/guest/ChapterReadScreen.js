@@ -1,11 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
 	View,
 	Text,
 	StyleSheet,
 	SafeAreaView,
 	ScrollView,
-	Image,
 	TouchableOpacity,
 	ActivityIndicator
 } from "react-native";
@@ -13,17 +12,32 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchChapterContent, clearChapterContent } from "../../redux_thunk/StorySlice";
 
+const API_URL = 'http://192.168.10.104:5555/api';
+
 const ChapterReadScreen = ({ navigation, route }) => {
 	const { chapterId, storyId } = route.params || {};
 	const dispatch = useDispatch();
 	const { currentChapterContent, currentStory, currentChapters, loading } = useSelector(state => state.story);
+	const { user } = useSelector(state => state.auth);
+	const scrollPositionRef = useRef(0);
+
+	const saveBookmark = async (position) => {
+		if (!user || !chapterId) return;
+		try {
+			await fetch(`${API_URL}/bookmarks`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ user_id: user.id, chapter_id: chapterId, scroll_position: Math.round(position) }),
+			});
+		} catch {}
+	};
 
 	useEffect(() => {
 		if (chapterId) {
 			dispatch(fetchChapterContent(chapterId));
 		}
-		
 		return () => {
+			saveBookmark(scrollPositionRef.current);
 			dispatch(clearChapterContent());
 		};
 	}, [dispatch, chapterId]);
@@ -69,6 +83,8 @@ const ChapterReadScreen = ({ navigation, route }) => {
 				<ScrollView
 					contentContainerStyle={styles.scrollContent}
 					showsVerticalScrollIndicator={false}
+					onScroll={e => { scrollPositionRef.current = e.nativeEvent.contentOffset.y; }}
+					scrollEventThrottle={500}
 				>
 					<View style={styles.canvas}>
 						<View style={styles.chapterHeader}>

@@ -15,12 +15,17 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	const [stories, setStories] = useState([]);
 	const [categories, setCategories] = useState([]);
 	const [loading, setLoading] = useState(true);
+	// Modal đăng truyện mới
 	const [showModal, setShowModal] = useState(false);
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
 	const [thumbnail, setThumbnail] = useState('');
 	const [categoryId, setCategoryId] = useState(null);
 	const [submitting, setSubmitting] = useState(false);
+	// Modal quản lý chương
+	const [managingStory, setManagingStory] = useState(null);
+	const [storyChapters, setStoryChapters] = useState([]);
+	const [chapLoading, setChapLoading] = useState(false);
 
 	const loadData = useCallback(async () => {
 		setLoading(true);
@@ -55,6 +60,37 @@ const AuthorDashboardScreen = ({ navigation }) => {
 		} catch { Alert.alert("Lỗi", "Không thể kết nối."); } finally { setSubmitting(false); }
 	};
 
+	const openChapterManager = async (story) => {
+		setManagingStory(story);
+		setChapLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/stories/${story.id}/chapters`).then(r => r.json());
+			setStoryChapters(res.data || []);
+		} finally {
+			setChapLoading(false);
+		}
+	};
+
+	const handleDeleteChapter = (chapter) => {
+		Alert.alert(
+			"Xóa chương",
+			`Xóa "Chương ${chapter.chapter_number}: ${chapter.title}"?`,
+			[
+				{ text: "Hủy", style: "cancel" },
+				{
+					text: "Xóa", style: "destructive",
+					onPress: async () => {
+						try {
+							await fetch(`${API_URL}/chapters/${chapter.id}`, { method: 'DELETE' });
+							setStoryChapters(prev => prev.filter(c => c.id !== chapter.id));
+							loadData();
+						} catch { Alert.alert("Lỗi", "Không thể xóa chương."); }
+					}
+				}
+			]
+		);
+	};
+
 	const renderStory = ({ item }) => (
 		<View style={s.card}>
 			<View style={s.rowBetween}>
@@ -64,10 +100,16 @@ const AuthorDashboardScreen = ({ navigation }) => {
 				</View>
 			</View>
 			<Text style={s.cardMeta}>{item.category_name} • {item.chapter_count} chương</Text>
-			<TouchableOpacity style={s.chapBtn} onPress={() => navigation.navigate("AddChapter", { storyId: item.id, storyTitle: item.title })}>
-				<MaterialIcons name="add" size={15} color="#8B4513" />
-				<Text style={s.chapBtnText}>Thêm chương</Text>
-			</TouchableOpacity>
+			<View style={s.cardActions}>
+				<TouchableOpacity style={s.chapBtn} onPress={() => navigation.navigate("AddChapter", { storyId: item.id, storyTitle: item.title })}>
+					<MaterialIcons name="add" size={15} color="#8B4513" />
+					<Text style={s.chapBtnText}>Thêm chương</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={s.manageBtn} onPress={() => openChapterManager(item)}>
+					<MaterialIcons name="list" size={15} color="#888888" />
+					<Text style={s.manageBtnText}>Quản lý chương</Text>
+				</TouchableOpacity>
+			</View>
 		</View>
 	);
 
@@ -94,6 +136,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 					<FlatList data={stories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
 				)}
 
+			{/* Modal đăng truyện mới */}
 			<Modal visible={showModal} animationType="slide" transparent>
 				<View style={s.overlay}>
 					<View style={s.sheet}>
@@ -132,6 +175,55 @@ const AuthorDashboardScreen = ({ navigation }) => {
 					</View>
 				</View>
 			</Modal>
+
+			{/* Modal quản lý chương */}
+			<Modal visible={!!managingStory} animationType="slide" transparent>
+				<View style={s.overlay}>
+					<View style={s.sheet}>
+						<View style={s.sheetHeader}>
+							<View style={{ flex: 1 }}>
+								<Text style={s.sheetTitle}>Danh sách chương</Text>
+								{managingStory && <Text style={{ fontSize: 12, color: "#888888", marginTop: 2 }} numberOfLines={1}>{managingStory.title}</Text>}
+							</View>
+							<TouchableOpacity onPress={() => setManagingStory(null)}><MaterialIcons name="close" size={22} color="#888888" /></TouchableOpacity>
+						</View>
+						{chapLoading ? (
+							<View style={{ paddingVertical: 32, alignItems: "center" }}><ActivityIndicator color="#8B4513" /></View>
+						) : storyChapters.length === 0 ? (
+							<View style={{ paddingVertical: 32, alignItems: "center", gap: 8 }}>
+								<MaterialIcons name="menu-book" size={40} color="#DDDDDD" />
+								<Text style={{ color: "#888888", fontSize: 14 }}>Chưa có chương nào.</Text>
+							</View>
+						) : (
+							<ScrollView showsVerticalScrollIndicator={false}>
+								{storyChapters.map(chap => (
+									<View key={chap.id} style={s.chapRow}>
+										<View style={{ flex: 1 }}>
+											<Text style={s.chapRowTitle}>Chương {chap.chapter_number}: {chap.title}</Text>
+											{chap.is_vip ? (
+												<Text style={s.chapVipBadge}>VIP</Text>
+											) : null}
+										</View>
+										<TouchableOpacity style={s.deleteChapBtn} onPress={() => handleDeleteChapter(chap)}>
+											<MaterialIcons name="delete-outline" size={20} color="#D32F2F" />
+										</TouchableOpacity>
+									</View>
+								))}
+							</ScrollView>
+						)}
+						<TouchableOpacity
+							style={[s.submitBtn, { marginTop: 12 }]}
+							onPress={() => {
+								setManagingStory(null);
+								navigation.navigate("AddChapter", { storyId: managingStory?.id, storyTitle: managingStory?.title });
+							}}
+						>
+							<MaterialIcons name="add" size={16} color="#fff" />
+							<Text style={s.submitText}>Thêm chương mới</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</Modal>
 		</SafeAreaView>
 	);
 };
@@ -151,8 +243,11 @@ const s = StyleSheet.create({
 	badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 	badgeText: { fontSize: 10, fontWeight: "700" },
 	cardMeta: { fontSize: 12, color: "#888888", marginBottom: 10 },
-	chapBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "#EBEBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start", backgroundColor: "#F5F5F5" },
+	cardActions: { flexDirection: "row", gap: 8 },
+	chapBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "#EBEBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#F5F5F5" },
 	chapBtnText: { fontSize: 12, color: "#8B4513", fontWeight: "600" },
+	manageBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "#EBEBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#F5F5F5" },
+	manageBtnText: { fontSize: 12, color: "#888888", fontWeight: "600" },
 	overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
 	sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
 	sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
@@ -165,8 +260,12 @@ const s = StyleSheet.create({
 	chipActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
 	chipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
 	chipTextActive: { color: "#FFFFFF" },
-	submitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center", marginTop: 8 },
+	submitBtn: { backgroundColor: "#8B4513", paddingVertical: 14, borderRadius: 999, alignItems: "center", marginTop: 8, flexDirection: "row", justifyContent: "center", gap: 6 },
 	submitText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+	chapRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+	chapRowTitle: { fontSize: 14, fontWeight: "600", color: "#1A1A1A" },
+	chapVipBadge: { fontSize: 10, color: "#8B4513", fontWeight: "700", marginTop: 2 },
+	deleteChapBtn: { padding: 6 },
 });
 
 export default AuthorDashboardScreen;

@@ -34,6 +34,11 @@ const StoryDetailScreen = ({ navigation, route }) => {
 	const [commentText, setCommentText] = useState('');
 	const [rating, setRating] = useState(5);
 	const [postingComment, setPostingComment] = useState(false);
+	// Bookmark / tiếp tục đọc
+	const [bookmark, setBookmark] = useState(null);
+	// Xem tất cả chương
+	const [showAllChapters, setShowAllChapters] = useState(false);
+	const CHAPTERS_PREVIEW = 5;
 
 	const loadComments = useCallback(async () => {
 		if (!storyId) return;
@@ -42,6 +47,14 @@ const StoryDetailScreen = ({ navigation, route }) => {
 			if (data.status === "success") setComments(data.data);
 		} catch {}
 	}, [storyId]);
+
+	const loadBookmark = useCallback(async () => {
+		if (!user || !storyId) return;
+		try {
+			const data = await fetch(`${API_URL}/bookmarks/${user.id}/${storyId}`).then(r => r.json());
+			if (data.status === "success" && data.data) setBookmark(data.data);
+		} catch {}
+	}, [user, storyId]);
 
 	const handlePostComment = async () => {
 		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để bình luận."); return; }
@@ -60,18 +73,32 @@ const StoryDetailScreen = ({ navigation, route }) => {
 		} finally { setPostingComment(false); }
 	};
 
+	const handleDeleteComment = (commentId) => {
+		Alert.alert("Xóa bình luận", "Bạn muốn xóa bình luận này?", [
+			{ text: "Hủy", style: "cancel" },
+			{
+				text: "Xóa", style: "destructive",
+				onPress: async () => {
+					try {
+						await fetch(`${API_URL}/comments/${commentId}/${user.id}`, { method: 'DELETE' });
+						setComments(prev => prev.filter(c => c.id !== commentId));
+					} catch {}
+				}
+			}
+		]);
+	};
+
 	useEffect(() => {
 		if (storyId) {
 			dispatch(fetchStoryDetails(storyId));
 			dispatch(fetchChapters(storyId));
 			loadComments();
+			loadBookmark();
 		}
-		
-		// Clean up khi rời khỏi trang màn hình
 		return () => {
 			dispatch(clearCurrentStory());
 		};
-	}, [dispatch, storyId, loadComments]);
+	}, [dispatch, storyId, loadComments, loadBookmark]);
 
 	if (loading || !currentStory) {
 		return (
@@ -143,13 +170,23 @@ const StoryDetailScreen = ({ navigation, route }) => {
 					</View>
 
 					<View style={styles.actionsRow}>
-						<TouchableOpacity 
-							style={[styles.actionButton, styles.actionPrimary]}
-							onPress={() => currentChapters.length > 0 && navigation.navigate("ChapterRead", { chapterId: currentChapters[0].id, storyId: currentStory.id })}
-						>
-							<MaterialIcons name="menu-book" size={18} color="#fff7f5" />
-							<Text style={styles.actionPrimaryText}>Đọc Ngay</Text>
-						</TouchableOpacity>
+						{bookmark ? (
+							<TouchableOpacity
+								style={[styles.actionButton, styles.actionPrimary]}
+								onPress={() => navigation.navigate("ChapterRead", { chapterId: bookmark.chapter_id, storyId: currentStory.id })}
+							>
+								<MaterialIcons name="bookmark" size={18} color="#FFFFFF" />
+								<Text style={styles.actionPrimaryText}>Tiếp tục Chương {bookmark.chapter_number}</Text>
+							</TouchableOpacity>
+						) : (
+							<TouchableOpacity
+								style={[styles.actionButton, styles.actionPrimary]}
+								onPress={() => currentChapters.length > 0 && navigation.navigate("ChapterRead", { chapterId: currentChapters[0].id, storyId: currentStory.id })}
+							>
+								<MaterialIcons name="menu-book" size={18} color="#FFFFFF" />
+								<Text style={styles.actionPrimaryText}>Đọc Ngay</Text>
+							</TouchableOpacity>
+						)}
 						<TouchableOpacity
 							style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
 							disabled={libraryLoading}
@@ -215,7 +252,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							</View>
 							<View style={styles.chapterList}>
 								{currentChapters.length > 0 ? (
-									currentChapters.map((chapter) => (
+									(showAllChapters ? currentChapters : currentChapters.slice(0, CHAPTERS_PREVIEW)).map((chapter) => (
 										<TouchableOpacity
 											key={chapter.id}
 											style={[
@@ -225,13 +262,8 @@ const StoryDetailScreen = ({ navigation, route }) => {
 											]}
 											onPress={() => navigation.navigate("ChapterRead", { chapterId: chapter.id, storyId: currentStory.id })}
 										>
-											<View>
-												<Text
-													style={[
-														styles.chapterMeta,
-														!chapter.is_vip && styles.chapterMetaOpen,
-													]}
-												>
+											<View style={{ flex: 1 }}>
+												<Text style={[styles.chapterMeta, !chapter.is_vip && styles.chapterMetaOpen]}>
 													Chương {chapter.chapter_number}
 												</Text>
 												<Text style={styles.chapterTitle}>{chapter.title}</Text>
@@ -244,15 +276,20 @@ const StoryDetailScreen = ({ navigation, route }) => {
 										</TouchableOpacity>
 									))
 								) : (
-									<Text style={{ textAlign: "center", color: "#8B4513", marginVertical: 10 }}>
+									<Text style={{ textAlign: "center", color: "#888888", marginVertical: 10 }}>
 										Truyện chưa cập nhật chương nào.
 									</Text>
 								)}
 							</View>
 
-							<TouchableOpacity style={styles.viewAllButton}>
-								<Text style={styles.viewAllText}>Xem Tất Cả Chương</Text>
-							</TouchableOpacity>
+							{currentChapters.length > CHAPTERS_PREVIEW && (
+								<TouchableOpacity style={styles.viewAllButton} onPress={() => setShowAllChapters(!showAllChapters)}>
+									<Text style={styles.viewAllText}>
+										{showAllChapters ? `Thu gọn` : `Xem tất cả ${currentChapters.length} chương`}
+									</Text>
+									<MaterialIcons name={showAllChapters ? "expand-less" : "expand-more"} size={18} color="#8B4513" />
+								</TouchableOpacity>
+							)}
 						</View>
 
 						{/* === BÌNH LUẬN === */}
@@ -305,13 +342,20 @@ const StoryDetailScreen = ({ navigation, route }) => {
 										<View style={styles.commentBody}>
 											<View style={styles.commentTop}>
 												<Text style={styles.commentName}>{c.full_name || c.username}</Text>
-												{c.rating && (
-													<View style={styles.commentRatingRow}>
-														{Array.from({ length: c.rating }).map((_, i) => (
-															<MaterialIcons key={i} name="star" size={11} color="#8B4513" />
-														))}
-													</View>
-												)}
+												<View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+													{c.rating && (
+														<View style={styles.commentRatingRow}>
+															{Array.from({ length: c.rating }).map((_, i) => (
+																<MaterialIcons key={i} name="star" size={11} color="#8B4513" />
+															))}
+														</View>
+													)}
+													{user?.id === c.user_id && (
+														<TouchableOpacity onPress={() => handleDeleteComment(c.id)}>
+															<MaterialIcons name="delete-outline" size={16} color="#D32F2F" />
+														</TouchableOpacity>
+													)}
+												</View>
 											</View>
 											<Text style={styles.commentText}>{c.content}</Text>
 											<Text style={styles.commentTime}>{new Date(c.created_at).toLocaleDateString("vi-VN")}</Text>
@@ -337,7 +381,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 						<Text style={styles.miniTitle}>Chương 02: Lời Nguyền...</Text>
 					</View>
 					<TouchableOpacity style={styles.miniPlay}>
-						<MaterialIcons name="play-arrow" size={18} color="#fff7f5" />
+						<MaterialIcons name="play-arrow" size={18} color="#FFFFFF" />
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -391,8 +435,8 @@ const styles = StyleSheet.create({
 	chapterMeta: { fontSize: 11, color: "#AAAAAA" },
 	chapterMetaOpen: { color: "#8B4513" },
 	chapterTitle: { fontSize: 13, fontWeight: "600", color: "#1A1A1A", marginTop: 2 },
-	viewAllButton: { paddingVertical: 12 },
-	viewAllText: { fontSize: 13, fontWeight: "700", color: "#8B4513", textAlign: "center" },
+	viewAllButton: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+	viewAllText: { fontSize: 13, fontWeight: "700", color: "#8B4513" },
 	commentsSection: { marginTop: 0, backgroundColor: "#FAFAFA", borderRadius: 12, padding: 14, gap: 12, borderWidth: 1, borderColor: "#F0F0F0" },
 	commentInputWrap: { gap: 8 },
 	starRow: { flexDirection: "row", alignItems: "center", gap: 4 },
