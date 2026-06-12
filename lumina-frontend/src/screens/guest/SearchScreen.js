@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
 	View, Text, TextInput, TouchableOpacity, FlatList,
 	StyleSheet, SafeAreaView, Image, ActivityIndicator
@@ -7,8 +7,10 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCategories } from "../../redux_thunk/StorySlice";
 
-const API_URL = 'http://10.106.42.58:5555/api';
+import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
+
+const PAGE_SIZE = 10;
 
 const SearchScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
@@ -16,20 +18,26 @@ const SearchScreen = ({ navigation }) => {
 
 	const [query, setQuery] = useState('');
 	const [selectedCategory, setSelectedCategory] = useState(null);
+	const [sortBy, setSortBy] = useState('newest');
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [searched, setSearched] = useState(false);
+	const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+
+	const debounceRef = useRef(null);
 
 	useEffect(() => {
 		dispatch(fetchCategories());
 	}, [dispatch]);
 
-	const doSearch = useCallback(async () => {
+	const doSearch = useCallback(async (searchQuery, catId, sort) => {
 		setLoading(true);
 		setSearched(true);
+		setDisplayCount(PAGE_SIZE);
 		try {
-			let url = `${API_URL}/stories/search?q=${encodeURIComponent(query)}`;
-			if (selectedCategory) url += `&category_id=${selectedCategory}`;
+			let url = `${API_URL}/stories/search?q=${encodeURIComponent(searchQuery || '')}`;
+			if (catId) url += `&category_id=${catId}`;
+			if (sort) url += `&sort=${sort}`;
 			const data = await fetch(url).then(r => r.json());
 			setResults(data.status === "success" ? data.data : []);
 		} catch {
@@ -37,12 +45,26 @@ const SearchScreen = ({ navigation }) => {
 		} finally {
 			setLoading(false);
 		}
-	}, [query, selectedCategory]);
+	}, []);
 
-	// Tự động search khi chọn thể loại
+	const handleQueryChange = (text) => {
+		setQuery(text);
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		if (text.length > 0) {
+			debounceRef.current = setTimeout(() => doSearch(text, selectedCategory, sortBy), 500);
+		} else {
+			setResults([]);
+			setSearched(false);
+		}
+	};
+
+	// Tự động search khi chọn thể loại hoặc đổi sắp xếp
 	useEffect(() => {
-		if (selectedCategory !== null) doSearch();
-	}, [selectedCategory]);
+		if (searched || selectedCategory !== null) doSearch(query, selectedCategory, sortBy);
+	}, [selectedCategory, sortBy]);
+
+	const displayed = results.slice(0, displayCount);
+	const hasMore = displayCount < results.length;
 
 	const renderStory = ({ item }) => (
 		<TouchableOpacity
@@ -50,21 +72,18 @@ const SearchScreen = ({ navigation }) => {
 			onPress={() => navigation.navigate("StoryDetail", { storyId: item.id })}
 			activeOpacity={0.85}
 		>
-			<Image
-				source={{ uri: item.cover_image || DEFAULT_COVER }}
-				style={styles.cardCover}
-			/>
+			<Image source={{ uri: item.cover_image || DEFAULT_COVER }} style={styles.cardCover} />
 			<View style={styles.cardInfo}>
 				<Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
 				<Text style={styles.cardAuthor} numberOfLines={1}>
-					<MaterialIcons name="person" size={12} color="#8c4f3b" /> {item.author_name || "Ẩn danh"}
+					<MaterialIcons name="person" size={12} color="#8B4513" /> {item.author_name || "Ẩn danh"}
 				</Text>
 				<View style={styles.cardMeta}>
 					<View style={styles.categoryPill}>
 						<Text style={styles.categoryPillText}>{item.category_name || "Khác"}</Text>
 					</View>
 					<Text style={styles.viewCount}>
-						<MaterialIcons name="visibility" size={12} color="#b3b2af" /> {item.views || 0}
+						<MaterialIcons name="visibility" size={12} color="#BBBBBB" /> {item.views || 0}
 					</Text>
 				</View>
 				<Text style={styles.cardDesc} numberOfLines={2}>{item.description || "Chưa có mô tả."}</Text>
@@ -78,26 +97,40 @@ const SearchScreen = ({ navigation }) => {
 				<Text style={styles.headerTitle}>Tìm Kiếm</Text>
 			</View>
 
-			{/* Search bar */}
 			<View style={styles.searchBar}>
-				<MaterialIcons name="search" size={20} color="#8c4f3b" style={{ marginRight: 8 }} />
+				<MaterialIcons name="search" size={20} color="#8B4513" style={{ marginRight: 8 }} />
 				<TextInput
 					style={styles.searchInput}
 					placeholder="Tên truyện, tác giả..."
-					placeholderTextColor="#b3b2af"
+					placeholderTextColor="#BBBBBB"
 					value={query}
-					onChangeText={setQuery}
-					onSubmitEditing={doSearch}
+					onChangeText={handleQueryChange}
+					onSubmitEditing={() => doSearch(query, selectedCategory, sortBy)}
 					returnKeyType="search"
 				/>
 				{query.length > 0 && (
 					<TouchableOpacity onPress={() => { setQuery(''); setResults([]); setSearched(false); }}>
-						<MaterialIcons name="close" size={18} color="#b3b2af" />
+						<MaterialIcons name="close" size={18} color="#BBBBBB" />
 					</TouchableOpacity>
 				)}
 			</View>
 
-			{/* Category filter chips */}
+			<View style={styles.sortRow}>
+				<MaterialIcons name="sort" size={14} color="#888888" />
+				<TouchableOpacity
+					style={[styles.sortChip, sortBy === 'newest' && styles.sortChipActive]}
+					onPress={() => setSortBy('newest')}
+				>
+					<Text style={[styles.sortChipText, sortBy === 'newest' && styles.sortChipTextActive]}>Mới nhất</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.sortChip, sortBy === 'views' && styles.sortChipActive]}
+					onPress={() => setSortBy('views')}
+				>
+					<Text style={[styles.sortChipText, sortBy === 'views' && styles.sortChipTextActive]}>Xem nhiều nhất</Text>
+				</TouchableOpacity>
+			</View>
+
 			<View style={styles.chipRow}>
 				<TouchableOpacity
 					style={[styles.chip, !selectedCategory && styles.chipActive]}
@@ -118,28 +151,33 @@ const SearchScreen = ({ navigation }) => {
 				))}
 			</View>
 
-			{/* Results */}
 			{loading ? (
 				<View style={styles.center}>
-					<ActivityIndicator size="large" color="#dca77c" />
+					<ActivityIndicator size="large" color="#8B4513" />
 				</View>
 			) : searched && results.length === 0 ? (
 				<View style={styles.center}>
-					<MaterialIcons name="search-off" size={48} color="#dca77c" />
+					<MaterialIcons name="search-off" size={48} color="#DDDDDD" />
 					<Text style={styles.emptyText}>Không tìm thấy truyện nào.</Text>
 				</View>
 			) : !searched ? (
 				<View style={styles.center}>
-					<MaterialIcons name="auto-stories" size={52} color="#dca77c" />
+					<MaterialIcons name="auto-stories" size={52} color="#DDDDDD" />
 					<Text style={styles.emptyText}>Nhập tên truyện hoặc chọn thể loại để tìm.</Text>
 				</View>
 			) : (
 				<FlatList
-					data={results}
+					data={displayed}
 					keyExtractor={item => String(item.id)}
 					renderItem={renderStory}
 					contentContainerStyle={styles.list}
 					showsVerticalScrollIndicator={false}
+					ListFooterComponent={hasMore ? (
+						<TouchableOpacity style={styles.loadMoreBtn} onPress={() => setDisplayCount(prev => prev + PAGE_SIZE)}>
+							<Text style={styles.loadMoreText}>Xem thêm ({results.length - displayCount} kết quả)</Text>
+							<MaterialIcons name="expand-more" size={18} color="#8B4513" />
+						</TouchableOpacity>
+					) : null}
 				/>
 			)}
 		</SafeAreaView>
@@ -147,80 +185,40 @@ const SearchScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: "#fcf9f7" },
+	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
 	header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-	headerTitle: { fontSize: 22, fontWeight: "800", color: "#323331", letterSpacing: 0.5 },
-
+	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
 	searchBar: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#fff",
-		marginHorizontal: 16,
-		marginBottom: 12,
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.3)",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.06,
-		shadowRadius: 4,
-		elevation: 2,
+		flexDirection: "row", alignItems: "center", backgroundColor: "#F5F5F5",
+		marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 10,
+		borderRadius: 12, borderWidth: 1, borderColor: "#EBEBEB",
 	},
-	searchInput: { flex: 1, fontSize: 14, color: "#323331" },
-
-	chipRow: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		paddingHorizontal: 16,
-		gap: 8,
-		marginBottom: 12,
-	},
-	chip: {
-		paddingHorizontal: 14,
-		paddingVertical: 6,
-		borderRadius: 999,
-		borderWidth: 1,
-		borderColor: "rgba(140,79,59,0.3)",
-		backgroundColor: "#fff",
-	},
-	chipActive: { backgroundColor: "#8c4f3b", borderColor: "#8c4f3b" },
-	chipText: { fontSize: 12, color: "#8c4f3b", fontWeight: "600" },
-	chipTextActive: { color: "#fff" },
-
+	searchInput: { flex: 1, fontSize: 14, color: "#1A1A1A" },
+	chipRow: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 8, marginBottom: 12 },
+	chip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5" },
+	chipActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
+	chipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
+	chipTextActive: { color: "#FFFFFF" },
 	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-	emptyText: { fontSize: 14, color: "#8c4f3b", textAlign: "center", paddingHorizontal: 32 },
-
+	emptyText: { fontSize: 14, color: "#888888", textAlign: "center", paddingHorizontal: 32 },
 	list: { paddingHorizontal: 16, paddingBottom: 24 },
-	card: {
-		flexDirection: "row",
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		marginBottom: 12,
-		overflow: "hidden",
-		borderWidth: 1,
-		borderColor: "rgba(179,178,175,0.2)",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
-	},
+	card: { flexDirection: "row", backgroundColor: "#FFFFFF", borderRadius: 12, marginBottom: 12, overflow: "hidden", borderWidth: 1, borderColor: "#F0F0F0" },
 	cardCover: { width: 80, height: 110 },
 	cardInfo: { flex: 1, padding: 12, justifyContent: "space-between" },
-	cardTitle: { fontSize: 14, fontWeight: "700", color: "#323331", lineHeight: 20 },
-	cardAuthor: { fontSize: 12, color: "#8c4f3b", marginTop: 2 },
+	cardTitle: { fontSize: 14, fontWeight: "700", color: "#1A1A1A", lineHeight: 20 },
+	cardAuthor: { fontSize: 12, color: "#8B4513", marginTop: 2 },
 	cardMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-	categoryPill: {
-		backgroundColor: "rgba(140,79,59,0.1)",
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 999,
-	},
-	categoryPillText: { fontSize: 10, color: "#8c4f3b", fontWeight: "600" },
-	viewCount: { fontSize: 11, color: "#b3b2af" },
-	cardDesc: { fontSize: 11, color: "#5f5f5d", lineHeight: 16, marginTop: 4 },
+	categoryPill: { backgroundColor: "#F2E8E3", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+	categoryPillText: { fontSize: 10, color: "#8B4513", fontWeight: "600" },
+	viewCount: { fontSize: 11, color: "#BBBBBB" },
+	cardDesc: { fontSize: 11, color: "#888888", lineHeight: 16, marginTop: 4 },
+	loadMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5", marginTop: 4, marginBottom: 8 },
+	loadMoreText: { fontSize: 13, fontWeight: "700", color: "#8B4513" },
+	sortRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+	sortChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: "#EBEBEB", backgroundColor: "#F5F5F5" },
+	sortChipActive: { backgroundColor: "#F2E8E3", borderColor: "#8B4513" },
+	sortChipText: { fontSize: 12, color: "#888888", fontWeight: "600" },
+	sortChipTextActive: { color: "#8B4513" },
 });
 
 export default SearchScreen;

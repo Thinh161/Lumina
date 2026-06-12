@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -10,8 +10,10 @@ import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
 import LoginScreen from "../screens/guest/LoginScreen";
 import RegisterScreen from "../screens/guest/RegisterScreen";
 import ChapterReadScreen from "../screens/guest/ChapterReadScreen";
+import ForgotPasswordScreen from "../screens/guest/ForgotPasswordScreen";
 import SearchScreen from "../screens/guest/SearchScreen";
 import UserNavigation from "./UserNavigation";
+import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -56,10 +58,10 @@ const GuestTabs = () => {
 			screenOptions={{
 				headerShown: false,
 				tabBarShowLabel: true,
-				tabBarActiveTintColor: "#fff7f5",
-				tabBarInactiveTintColor: "#323331",
-				tabBarActiveBackgroundColor: "#8c4f3b",
-				tabBarInactiveBackgroundColor: "rgba(252, 249, 247, 0.92)",
+				tabBarActiveTintColor: "#8B4513",
+				tabBarInactiveTintColor: "#AAAAAA",
+				tabBarActiveBackgroundColor: "#FFFFFF",
+				tabBarInactiveBackgroundColor: "#FFFFFF",
 				tabBarStyle: styles.tabBar,
 				tabBarLabelStyle: styles.tabLabel,
 				tabBarItemStyle: styles.tabItem,
@@ -77,7 +79,16 @@ const GuestTabs = () => {
 			/>
 			<Tab.Screen
 				name="LibraryTab"
-				children={() => <PlaceholderScreen label="Thư viện" />}
+				children={({ navigation }) => (
+					<View style={styles.loginPrompt}>
+						<MaterialIcons name="auto-stories" size={60} color="#EBEBEB" />
+						<Text style={styles.loginPromptTitle}>Thư viện của bạn</Text>
+						<Text style={styles.loginPromptSub}>Đăng nhập để lưu và xem lại những truyện yêu thích.</Text>
+						<TouchableOpacity style={styles.loginPromptBtn} onPress={() => navigation.navigate("LoginTab")}>
+							<Text style={styles.loginPromptBtnText}>Đăng nhập ngay</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 				options={{
 					tabBarLabel: "Thư viện",
 					tabBarIcon: ({ color, size }) => (
@@ -119,8 +130,11 @@ const Navigation = () => {
 				<Stack.Screen name="Guest" component={GuestTabs} />
 				<Stack.Screen name="Login" component={LoginScreen} />
 				<Stack.Screen name="Register" component={RegisterScreen} />
+				<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 				<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
+				<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
 				<Stack.Screen name="Reader" component={UserNavigation} />
+				<Stack.Screen name="Admin" component={AdminDashboardScreen} />
 			</Stack.Navigator>
 		</NavigationContainer>
 	);
@@ -131,35 +145,36 @@ const Navigation = () => {
 // ==========================================
 const styles = StyleSheet.create({
 	tabBar: {
-		backgroundColor: "rgba(252, 249, 247, 0.92)",
+		backgroundColor: "#FFFFFF",
 		borderTopWidth: 1,
-		borderTopColor: "rgba(179, 178, 175, 0.2)",
-		height: 64,
-		paddingBottom: 8,
-		paddingTop: 8,
+		borderTopColor: "#F0F0F0",
+		height: 60,
+		paddingBottom: 6,
+		paddingTop: 6,
 	},
 	tabLabel: {
-		fontSize: 9,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
+		fontSize: 10,
+		fontWeight: "600",
 	},
 	tabItem: {
-		borderRadius: 999,
-		marginHorizontal: 8,
-		overflow: "hidden",
+		borderRadius: 8,
 	},
 	placeholder: {
 		flex: 1,
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "#fcf9f7",
+		backgroundColor: "#FFFFFF",
 	},
 	placeholderText: {
 		fontSize: 16,
 		fontWeight: "600",
-		color: "#5f5f5d",
+		color: "#888888",
 	},
+	loginPrompt: { flex: 1, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 40 },
+	loginPromptTitle: { fontSize: 20, fontWeight: "800", color: "#1A1A1A" },
+	loginPromptSub: { fontSize: 14, color: "#888888", textAlign: "center", lineHeight: 20 },
+	loginPromptBtn: { marginTop: 8, backgroundColor: "#8B4513", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 999 },
+	loginPromptBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
 
 export default Navigation;

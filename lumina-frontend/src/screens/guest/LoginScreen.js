@@ -1,329 +1,116 @@
 import React, { useState, useEffect } from "react";
 import {
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	StyleSheet,
-	SafeAreaView,
-	ScrollView,
-	KeyboardAvoidingView,
-	Platform,
-	Alert,
-	ActivityIndicator
+	View, Text, TextInput, TouchableOpacity, StyleSheet,
+	SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator
 } from "react-native";
-import { FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser, clearError } from "../../redux_thunk/AuthSlice";
 
 const LoginScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
-	const { loading, error, user } = useSelector((state) => state.auth);
-
+	const { loading, error, user } = useSelector(s => s.auth);
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
+	const [showPass, setShowPass] = useState(false);
 
-	// Lắng nghe thay đổi khi Đăng nhập thành công thì chuyển trang
 	useEffect(() => {
-		if (user) {
-			Alert.alert("Thành công", `Chào mừng ${user.full_name || user.username}`);
-			navigation.replace("Reader");
-		}
+		if (user) { navigation.replace(user.role_id === 1 ? "Admin" : "Reader"); }
 	}, [user, navigation]);
 
-	// Lắng nghe thay đổi nếu có lỗi từ Redux
 	useEffect(() => {
-		if (error) {
-			Alert.alert("Lỗi", error);
-			dispatch(clearError());
-		}
+		if (error) { Alert.alert("Lỗi đăng nhập", error); dispatch(clearError()); }
 	}, [error, dispatch]);
 
 	const handleLogin = () => {
-		if (!username || !password) {
-			Alert.alert("Lỗi", "Vui lòng nhập tài khoản và mật khẩu");
-			return;
-		}
-		// Đẩy action gọi API thông qua Redux Thunk
+		if (!username || !password) { Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin"); return; }
 		dispatch(loginUser({ username, password }));
 	};
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-				style={styles.flex}
-			>
-				<ScrollView
-					contentContainerStyle={styles.container}
-					keyboardShouldPersistTaps="handled"
-				>
-					<View style={styles.brandWrap}>
-						<View style={styles.brandIcon}>
-							<Text style={styles.brandIconText}>LN</Text>
+		<SafeAreaView style={s.safe}>
+			<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+				<ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+
+					<View style={s.brand}>
+						<View style={s.logo}>
+							<MaterialIcons name="auto-stories" size={28} color="#8B4513" />
 						</View>
-						<Text style={styles.title}>Lumina Narrative</Text>
-						<Text style={styles.subtitle}>Tiếp tục hành trình của bạn</Text>
+						<Text style={s.appName}>Lumina</Text>
+						<Text style={s.appSub}>Đăng nhập để tiếp tục</Text>
 					</View>
 
-					<View style={styles.form}>
-						<View style={styles.field}>
-							<Text style={styles.label}>Tài khoản</Text>
+					<View style={s.form}>
+						<View style={s.field}>
+							<Text style={s.label}>Tên đăng nhập</Text>
 							<TextInput
-								placeholder="Tên đăng nhập"
-								placeholderTextColor="#9f9a97"
+								style={s.input}
+								placeholder="Nhập tên đăng nhập"
+								placeholderTextColor="#BBBBBB"
 								autoCapitalize="none"
-								style={styles.input}
 								value={username}
 								onChangeText={setUsername}
 							/>
 						</View>
 
-						<View style={styles.field}>
-							<View style={styles.fieldHeader}>
-								<Text style={styles.label}>Mật khẩu</Text>
-								<TouchableOpacity onPress={() => navigation.navigate("Register")}>
-									<Text style={styles.linkSmall}>Quên mật khẩu?</Text>
+						<View style={s.field}>
+							<View style={s.labelRow}>
+								<Text style={s.label}>Mật khẩu</Text>
+								<TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}><Text style={s.forgot}>Quên mật khẩu?</Text></TouchableOpacity>
+							</View>
+							<View style={s.passWrap}>
+								<TextInput
+									style={[s.input, { flex: 1, borderWidth: 0 }]}
+									placeholder="Nhập mật khẩu"
+									placeholderTextColor="#BBBBBB"
+									secureTextEntry={!showPass}
+									value={password}
+									onChangeText={setPassword}
+								/>
+								<TouchableOpacity onPress={() => setShowPass(v => !v)} style={s.eyeBtn}>
+									<MaterialIcons name={showPass ? "visibility-off" : "visibility"} size={20} color="#BBBBBB" />
 								</TouchableOpacity>
 							</View>
-							<TextInput
-								placeholder="********"
-								placeholderTextColor="#9f9a97"
-								secureTextEntry
-								style={styles.input}
-								value={password}
-								onChangeText={setPassword}
-							/>
 						</View>
 
-						<TouchableOpacity
-							style={styles.primaryButton}
-							onPress={handleLogin}
-							disabled={loading}
-						>
-							{loading ? (
-								<ActivityIndicator color="#fff" />
-							) : (
-								<Text style={styles.primaryButtonText}>Đăng nhập</Text>
-							)}
+						<TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleLogin} disabled={loading}>
+							{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>Đăng nhập</Text>}
 						</TouchableOpacity>
 					</View>
 
-					<View style={styles.dividerRow}>
-						<View style={styles.dividerLine} />
-						<Text style={styles.dividerText}>Hoặc tiếp tục với</Text>
-						<View style={styles.dividerLine} />
-					</View>
-
-					<View style={styles.socialRow}>
-						<TouchableOpacity style={styles.socialButton}>
-							<FontAwesome
-								name="google"
-								size={18}
-								color="#5f5f5d"
-							/>
-							<Text style={styles.socialText}>Google</Text>
+					<View style={s.footer}>
+						<Text style={s.footerText}>Chưa có tài khoản? </Text>
+						<TouchableOpacity onPress={() => navigation.navigate("Register")}>
+							<Text style={s.footerLink}>Đăng ký ngay</Text>
 						</TouchableOpacity>
-
-						<TouchableOpacity style={styles.socialButton}>
-							<MaterialCommunityIcons
-								name="apple"
-								size={20}
-								color="#323331"
-							/>
-							<Text style={styles.socialText}>Apple</Text>
-						</TouchableOpacity>
-					</View>
-
-					<View style={styles.footer}>
-						<Text style={styles.footerText}>
-							Chưa có tài khoản?
-							<Text
-								style={styles.footerLink}
-								onPress={() => navigation.navigate("Register")}
-							>
-								{" "}Đăng ký
-							</Text>
-						</Text>
 					</View>
 				</ScrollView>
-
-				<View style={styles.blobTopRight} />
-				<View style={styles.blobBottomLeft} />
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };
 
-const styles = StyleSheet.create({
-	flex: {
-		flex: 1,
-	},
-	safeArea: {
-		flex: 1,
-		backgroundColor: "#fcf9f7",
-	},
-	container: {
-		paddingHorizontal: 28,
-		paddingTop: 48,
-		paddingBottom: 64,
-	},
-	brandWrap: {
-		alignItems: "center",
-		marginBottom: 40,
-	},
-	brandIcon: {
-		width: 64,
-		height: 64,
-		borderRadius: 32,
-		backgroundColor: "#f6f3f1",
-		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 16,
-	},
-	brandIconText: {
-		color: "#8c4f3b",
-		fontSize: 20,
-		fontWeight: "700",
-		letterSpacing: 1,
-	},
-	title: {
-		fontSize: 30,
-		fontWeight: "700",
-		color: "#323331",
-		textAlign: "center",
-	},
-	subtitle: {
-		marginTop: 6,
-		fontSize: 18,
-		color: "#5f5f5d",
-		fontStyle: "italic",
-		textAlign: "center",
-	},
-	form: {
-		gap: 20,
-	},
-	field: {
-		gap: 8,
-	},
-	fieldHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	label: {
-		fontSize: 11,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-		color: "#5f5f5d",
-		marginLeft: 4,
-	},
-	linkSmall: {
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 1.5,
-		textTransform: "uppercase",
-		color: "#8c4f3b",
-	},
-	input: {
-		backgroundColor: "#e4e2df",
-		paddingHorizontal: 18,
-		paddingVertical: 16,
-		borderRadius: 16,
-		fontSize: 16,
-		color: "#323331",
-	},
-	primaryButton: {
-		backgroundColor: "#8c4f3b",
-		paddingVertical: 16,
-		borderRadius: 999,
-		alignItems: "center",
-		marginTop: 4,
-	},
-	primaryButtonText: {
-		color: "#fff7f5",
-		fontSize: 12,
-		fontWeight: "700",
-		letterSpacing: 2,
-		textTransform: "uppercase",
-	},
-	dividerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginVertical: 28,
-	},
-	dividerLine: {
-		flex: 1,
-		height: 1,
-		backgroundColor: "#b3b2af",
-		opacity: 0.25,
-	},
-	dividerText: {
-		marginHorizontal: 12,
-		fontSize: 10,
-		fontWeight: "700",
-		letterSpacing: 2.5,
-		textTransform: "uppercase",
-		color: "#7b7b78",
-	},
-	socialRow: {
-		flexDirection: "row",
-		gap: 12,
-	},
-	socialButton: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 8,
-		paddingVertical: 14,
-		borderRadius: 999,
-		borderWidth: 1,
-		borderColor: "#d8d6d3",
-		backgroundColor: "#ffffff",
-	},
-	socialText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#5f5f5d",
-	},
-	footer: {
-		marginTop: 36,
-		alignItems: "center",
-	},
-	footerText: {
-		color: "#5f5f5d",
-		fontStyle: "italic",
-	},
-	footerLink: {
-		color: "#8c4f3b",
-		fontWeight: "700",
-		letterSpacing: 1.5,
-		textTransform: "uppercase",
-		fontStyle: "normal",
-		fontSize: 11,
-	},
-	blobTopRight: {
-		position: "absolute",
-		top: -80,
-		right: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: "#fdae95",
-		opacity: 0.12,
-	},
-	blobBottomLeft: {
-		position: "absolute",
-		bottom: -80,
-		left: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: "#ffdb98",
-		opacity: 0.12,
-	},
+const s = StyleSheet.create({
+	safe: { flex: 1, backgroundColor: '#FFFFFF' },
+	container: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
+	brand: { alignItems: 'center', marginBottom: 40 },
+	logo: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+	appName: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
+	appSub: { fontSize: 14, color: '#888888', marginTop: 4 },
+	form: { gap: 16 },
+	field: { gap: 6 },
+	label: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+	labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+	forgot: { fontSize: 12, color: '#8B4513' },
+	input: { backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, color: '#1A1A1A', borderWidth: 1, borderColor: '#EBEBEB' },
+	passWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 10, borderWidth: 1, borderColor: '#EBEBEB', overflow: 'hidden' },
+	eyeBtn: { paddingHorizontal: 14 },
+	btn: { backgroundColor: '#8B4513', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 8 },
+	btnDisabled: { opacity: 0.6 },
+	btnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+	footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
+	footerText: { fontSize: 14, color: '#888888' },
+	footerLink: { fontSize: 14, color: '#8B4513', fontWeight: '700' },
 });
 
 export default LoginScreen;
