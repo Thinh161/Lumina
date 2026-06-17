@@ -27,19 +27,8 @@ const LibraryScreen = ({ navigation }) => {
 		setRefreshing(false);
 	}, [dispatch, user]);
 
-	const handleRemove = (storyId, title) => {
-		Alert.alert(
-			"Xóa khỏi thư viện",
-			`Bỏ "${title}" khỏi thư viện?`,
-			[
-				{ text: "Hủy", style: "cancel" },
-				{
-					text: "Xóa",
-					style: "destructive",
-					onPress: () => dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId })),
-				},
-			]
-		);
+	const handleRemove = (storyId) => {
+		dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId }));
 	};
 
 	const renderItem = ({ item }) => (
@@ -63,7 +52,7 @@ const LibraryScreen = ({ navigation }) => {
 			</View>
 			<TouchableOpacity
 				style={styles.removeBtn}
-				onPress={() => handleRemove(item.id, item.title)}
+				onPress={() => handleRemove(item.id)}
 			>
 				<MaterialIcons name="bookmark-remove" size={22} color="#8B4513" />
 			</TouchableOpacity>

@@ -33,7 +33,8 @@ const EditProfileScreen = ({ navigation }) => {
 
 			if (res.status === "success") {
 				await dispatch(fetchUserProfile(user.id));
-				Alert.alert("Thành công", "Đã cập nhật hồ sơ.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+				Alert.alert("Thành công", "Đã cập nhật hồ sơ.");
+				navigation.goBack();
 			} else {
 				Alert.alert("Lỗi", res.message);
 			}

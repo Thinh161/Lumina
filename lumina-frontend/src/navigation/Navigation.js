@@ -14,6 +14,7 @@ import ForgotPasswordScreen from "../screens/guest/ForgotPasswordScreen";
 import SearchScreen from "../screens/guest/SearchScreen";
 import UserNavigation from "./UserNavigation";
 import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
+import GlobalConfirmModal from "../components/GlobalConfirmModal";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -136,6 +137,7 @@ const Navigation = () => {
 				<Stack.Screen name="Reader" component={UserNavigation} />
 				<Stack.Screen name="Admin" component={AdminDashboardScreen} />
 			</Stack.Navigator>
+			<GlobalConfirmModal />
 		</NavigationContainer>
 	);
 };

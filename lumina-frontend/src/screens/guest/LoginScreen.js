@@ -19,7 +19,7 @@ const LoginScreen = ({ navigation }) => {
 	}, [user, navigation]);
 
 	useEffect(() => {
-		if (error) { Alert.alert("Lỗi đăng nhập", error); dispatch(clearError()); }
+		if (error) { dispatch(clearError()); }
 	}, [error, dispatch]);
 
 	const handleLogin = () => {
@@ -73,6 +73,12 @@ const LoginScreen = ({ navigation }) => {
 							</View>
 						</View>
 
+						{error ? (
+							<View style={s.errorBox}>
+								<MaterialIcons name="error-outline" size={15} color="#D32F2F" />
+								<Text style={s.errorText}>{error}</Text>
+							</View>
+						) : null}
 						<TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleLogin} disabled={loading}>
 							{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>Đăng nhập</Text>}
 						</TouchableOpacity>
@@ -111,6 +117,8 @@ const s = StyleSheet.create({
 	footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
 	footerText: { fontSize: 14, color: '#888888' },
 	footerLink: { fontSize: 14, color: '#8B4513', fontWeight: '700' },
+	errorBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#FFCDD2' },
+	errorText: { fontSize: 13, color: '#D32F2F', flex: 1 },
 });
 
 export default LoginScreen;

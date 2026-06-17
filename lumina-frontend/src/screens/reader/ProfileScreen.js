@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
 	View, Text, StyleSheet, SafeAreaView, ScrollView,
-	Image, TouchableOpacity, Alert, Modal, ActivityIndicator,
+	Image, TouchableOpacity, Alert, Modal, ActivityIndicator, TextInput,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
@@ -11,12 +11,19 @@ import { fetchLibrary } from "../../redux_thunk/LibrarySlice";
 const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg";
 
 import { API_URL } from '../../config/api';
+import { confirmAlert } from '../../utils/confirmAlert';
 
 const BANK_INFO = {
 	bank: 'Vietcombank',
 	account: '1234 5678 9012',
 	owner: 'NGUYEN VAN ADMIN',
 };
+
+const VIP_PACKAGES = [
+	{ label: "1 tháng", vnd: 50000, months: 1 },
+	{ label: "3 tháng", vnd: 100000, months: 3 },
+	{ label: "Vĩnh viễn", vnd: 200000, months: null },
+];
 
 const TOPUP_PACKAGES = [
 	{ label: "10.000đ", vnd: 10000, xu: 10 },
@@ -40,6 +47,19 @@ const ProfileScreen = ({ navigation }) => {
 	const [selectedPkg, setSelectedPkg] = useState(null);
 	const [topupLoading, setTopupLoading] = useState(false);
 	const [unreadCount, setUnreadCount] = useState(0);
+	const [showVip, setShowVip] = useState(false);
+	const [selectedVipPkg, setSelectedVipPkg] = useState(null);
+	const [vipStep, setVipStep] = useState(1);
+	const [vipLoading, setVipLoading] = useState(false);
+
+	const [showWithdraw, setShowWithdraw] = useState(false);
+	const [withdrawXu, setWithdrawXu] = useState('');
+	const [withdrawBank, setWithdrawBank] = useState('');
+	const [withdrawAccount, setWithdrawAccount] = useState('');
+	const [withdrawOwner, setWithdrawOwner] = useState('');
+	const [withdrawStep, setWithdrawStep] = useState(1);
+	const [withdrawLoading, setWithdrawLoading] = useState(false);
+	const [withdrawResult, setWithdrawResult] = useState(null);
 
 	const isReader = user?.role_id === 4;
 
@@ -100,38 +120,67 @@ const ProfileScreen = ({ navigation }) => {
 		finally { setTopupLoading(false); }
 	};
 
+	const handleVipRequest = async () => {
+		if (!selectedVipPkg) return;
+		setVipLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/vip/request`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ user_id: user.id, amount_vnd: selectedVipPkg.vnd, months: selectedVipPkg.months }),
+			}).then(r => r.json());
+			if (res.status === 'success') {
+				setVipStep(3);
+			} else {
+				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
+			}
+		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+		finally { setVipLoading(false); }
+	};
+
 	const handleBuyVip = () => {
 		if (user?.is_vip) { Alert.alert("VIP", "Bạn đã là thành viên VIP rồi."); return; }
-		Alert.alert("Mua VIP", `Bạn sẽ tiêu 1000 xu để kích hoạt VIP vĩnh viễn.\nSố dư hiện tại: ${Number(user?.balance || 0).toLocaleString("vi-VN")} xu`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Mua ngay", onPress: async () => {
-					try {
-						const res = await fetch(`${API_URL}/users/${user.id}/buy-vip`, { method: 'PUT' }).then(r => r.json());
-						if (res.status === 'success') {
-							dispatch(fetchUserProfile(user.id));
-							Alert.alert("Thành công", res.message);
-						} else {
-							Alert.alert("Lỗi", res.message);
-						}
-					} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-				}
+		setSelectedVipPkg(null);
+		setVipStep(1);
+		setShowVip(true);
+	};
+
+	const handleWithdraw = async () => {
+		const xu = parseInt(withdrawXu, 10);
+		if (!xu || xu < 10) { Alert.alert("Lỗi", "Cần ít nhất 10 xu để rút."); return; }
+		if (!withdrawAccount.trim()) { Alert.alert("Lỗi", "Vui lòng nhập số tài khoản."); return; }
+		setWithdrawLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/withdraw/request`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					user_id: user.id,
+					amount_xu: xu,
+					bank_name: withdrawBank,
+					bank_account: withdrawAccount,
+					bank_owner: withdrawOwner,
+				}),
+			}).then(r => r.json());
+			if (res.status === 'success') {
+				setWithdrawResult(res);
+				setWithdrawStep(2);
+				dispatch(fetchUserProfile(user.id));
+			} else {
+				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
 			}
-		]);
+		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+		finally { setWithdrawLoading(false); }
 	};
 
 	const handleRequestAuthor = () => {
-		Alert.alert("Trở thành tác giả", "Gửi yêu cầu lên Admin để được cấp quyền đăng truyện?", [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Gửi yêu cầu", onPress: async () => {
-					try {
-						const res = await fetch(`${API_URL}/users/${user.id}/request-author`, { method: 'PUT' }).then(r => r.json());
-						Alert.alert(res.status === 'success' ? "Đã gửi" : "Thông báo", res.message);
-					} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-				}
-			}
-		]);
+		confirmAlert("Trở thành tác giả", "Gửi yêu cầu lên Admin để được cấp quyền đăng truyện?", async () => {
+			try {
+				const res = await fetch(`${API_URL}/users/${user.id}/request-author`, { method: 'PUT' }).then(r => r.json());
+				Alert.alert(res.status === 'success' ? "Đã gửi" : "Thông báo", res.message);
+				if (res.status === 'success') dispatch(fetchUserProfile(user.id));
+			} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+		});
 	};
 
 	const displayName = user?.full_name || user?.username || "Độc giả";
@@ -193,10 +242,16 @@ const ProfileScreen = ({ navigation }) => {
 									<Text style={styles.vipButtonText}>Nạp Xu</Text>
 									<MaterialIcons name="add" size={16} color="#FFFFFF" />
 								</TouchableOpacity>
-								{!user?.is_vip && (
+								{!user?.is_vip && !isAuthor && (
 									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#5D2E0C" }]} onPress={handleBuyVip}>
 										<Text style={styles.vipButtonText}>Mua VIP</Text>
 										<MaterialIcons name="star" size={16} color="#FFD700" />
+									</TouchableOpacity>
+								)}
+								{isAuthor && (
+									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#2E7D32" }]} onPress={() => { setWithdrawStep(1); setWithdrawXu(''); setWithdrawResult(null); setShowWithdraw(true); }}>
+										<Text style={styles.vipButtonText}>Rút Tiền</Text>
+										<MaterialIcons name="account-balance" size={16} color="#FFFFFF" />
 									</TouchableOpacity>
 								)}
 							</View>
@@ -271,6 +326,168 @@ const ProfileScreen = ({ navigation }) => {
 					</View>
 				</ScrollView>
 			</View>
+
+			{/* Modal Mua VIP */}
+			<Modal visible={showVip} animationType="slide" transparent>
+				<View style={styles.overlay}>
+					<View style={styles.sheet}>
+						<View style={styles.sheetHeader}>
+							<Text style={styles.sheetTitle}>
+								{vipStep === 1 ? 'Chọn gói VIP' : vipStep === 2 ? 'Thông tin chuyển khoản' : 'Đang chờ xác nhận'}
+							</Text>
+							{vipStep !== 3 && (
+								<TouchableOpacity onPress={() => { setShowVip(false); setVipStep(1); setSelectedVipPkg(null); }}>
+									<MaterialIcons name="close" size={22} color="#888888" />
+								</TouchableOpacity>
+							)}
+						</View>
+						{vipStep === 1 ? (
+							<>
+								<Text style={styles.sheetSub}>Chuyển khoản ngân hàng — Admin duyệt và cấp VIP</Text>
+								<View style={{ gap: 8 }}>
+									{VIP_PACKAGES.map(p => (
+										<TouchableOpacity
+											key={p.label}
+											style={[styles.packageBtn, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+												selectedVipPkg?.label === p.label && styles.packageBtnActive]}
+											onPress={() => setSelectedVipPkg(p)}
+										>
+											<View>
+												<Text style={[styles.packageBtnText, selectedVipPkg?.label === p.label && styles.packageBtnTextActive]}>{p.label}</Text>
+												<Text style={[styles.packageBtnXu, selectedVipPkg?.label === p.label && { color: '#FFFFFF' }]}>
+													{p.months ? `${p.months} tháng VIP` : 'VIP vĩnh viễn'}
+												</Text>
+											</View>
+											<Text style={[{ fontSize: 16, fontWeight: '800' }, selectedVipPkg?.label === p.label ? { color: '#FFFFFF' } : { color: '#8B4513' }]}>
+												{p.vnd.toLocaleString('vi-VN')}đ
+											</Text>
+										</TouchableOpacity>
+									))}
+								</View>
+								<TouchableOpacity
+									style={[styles.topupSubmitBtn, !selectedVipPkg && { opacity: 0.4 }]}
+									onPress={() => selectedVipPkg && setVipStep(2)} disabled={!selectedVipPkg}
+								>
+									<Text style={styles.topupSubmitText}>Tiếp theo</Text>
+									<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
+								</TouchableOpacity>
+							</>
+						) : vipStep === 2 ? (
+							<>
+								<View style={styles.bankCard}>
+									{[
+										{ label: 'Ngân hàng', value: BANK_INFO.bank },
+										{ label: 'Số tài khoản', value: BANK_INFO.account, bold: true },
+										{ label: 'Chủ tài khoản', value: BANK_INFO.owner },
+										{ label: 'Số tiền', value: `${selectedVipPkg?.vnd.toLocaleString('vi-VN')}đ`, accent: true },
+									].map(r => (
+										<View key={r.label} style={styles.bankRow}>
+											<Text style={styles.bankLabel}>{r.label}</Text>
+											<Text style={[styles.bankValue, r.bold && { fontSize: 16 }, r.accent && { color: '#8B4513' }]}>{r.value}</Text>
+										</View>
+									))}
+								</View>
+								<View style={styles.transferNoteBox}>
+									<Text style={styles.transferNoteLabel}>Nội dung chuyển khoản:</Text>
+									<Text style={styles.transferNoteValue}>LUMINA VIP {user?.username?.toUpperCase()} {selectedVipPkg?.vnd}</Text>
+								</View>
+								<Text style={styles.transferHint}>Sau khi chuyển khoản, ấn xác nhận. Admin sẽ kiểm tra và cấp VIP cho bạn.</Text>
+								<TouchableOpacity
+									style={[styles.topupSubmitBtn, vipLoading && { opacity: 0.6 }]}
+									onPress={handleVipRequest} disabled={vipLoading}
+								>
+									{vipLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.topupSubmitText}>Đã chuyển khoản — Xác nhận</Text>}
+								</TouchableOpacity>
+								<TouchableOpacity style={styles.backStepBtn} onPress={() => setVipStep(1)}>
+									<Text style={styles.backStepText}>Chọn lại gói khác</Text>
+								</TouchableOpacity>
+							</>
+						) : (
+							<View style={styles.waitingBox}>
+								<ActivityIndicator size="large" color="#8B4513" />
+								<Text style={styles.waitingTitle}>Yêu cầu đã được gửi!</Text>
+								<Text style={styles.waitingDesc}>
+									Admin sẽ kiểm tra và cấp <Text style={{ fontWeight: '800', color: '#8B4513' }}>{selectedVipPkg?.label} VIP</Text> cho bạn.
+								</Text>
+								<TouchableOpacity style={[styles.topupSubmitBtn, { marginTop: 8 }]}
+									onPress={() => { setShowVip(false); setVipStep(1); setSelectedVipPkg(null); }}>
+									<Text style={styles.topupSubmitText}>Đóng</Text>
+								</TouchableOpacity>
+							</View>
+						)}
+					</View>
+				</View>
+			</Modal>
+
+			{/* Modal Rút Tiền */}
+			<Modal visible={showWithdraw} animationType="slide" transparent>
+				<View style={styles.overlay}>
+					<View style={[styles.sheet, { gap: 14 }]}>
+						<View style={styles.sheetHeader}>
+							<Text style={styles.sheetTitle}>{withdrawStep === 1 ? 'Rút tiền' : 'Yêu cầu đã gửi'}</Text>
+							{withdrawStep !== 2 && (
+								<TouchableOpacity onPress={() => setShowWithdraw(false)}>
+									<MaterialIcons name="close" size={22} color="#888888" />
+								</TouchableOpacity>
+							)}
+						</View>
+						{withdrawStep === 1 ? (
+							<ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+								<Text style={[styles.sheetSub, { marginBottom: 4 }]}>Số dư: <Text style={{ fontWeight: '800', color: '#8B4513' }}>{Number(user?.balance || 0).toLocaleString('vi-VN')} xu</Text></Text>
+								<Text style={[styles.sheetSub, { marginBottom: 4 }]}>Tỷ lệ: 1 xu = 1.000đ</Text>
+								<View style={{ gap: 10, marginTop: 8 }}>
+									<View>
+										<Text style={styles.withdrawLabel}>Số xu muốn rút</Text>
+										<TextInput
+											style={styles.withdrawInput}
+											keyboardType="numeric"
+											placeholder="Tối thiểu 10 xu"
+											placeholderTextColor="#BBBBBB"
+											value={withdrawXu}
+											onChangeText={setWithdrawXu}
+										/>
+									</View>
+									{withdrawXu ? (
+										<Text style={{ fontSize: 13, color: '#2E7D32', fontWeight: '700' }}>
+											= {(parseInt(withdrawXu, 10) * 1000).toLocaleString('vi-VN')}đ
+										</Text>
+									) : null}
+									<View>
+										<Text style={styles.withdrawLabel}>Tên ngân hàng</Text>
+										<TextInput style={styles.withdrawInput} placeholder="VD: Vietcombank" placeholderTextColor="#BBBBBB" value={withdrawBank} onChangeText={setWithdrawBank} />
+									</View>
+									<View>
+										<Text style={styles.withdrawLabel}>Số tài khoản *</Text>
+										<TextInput style={styles.withdrawInput} placeholder="Nhập số tài khoản" placeholderTextColor="#BBBBBB" value={withdrawAccount} onChangeText={setWithdrawAccount} />
+									</View>
+									<View>
+										<Text style={styles.withdrawLabel}>Tên chủ tài khoản</Text>
+										<TextInput style={styles.withdrawInput} placeholder="Nhập tên chủ TK" placeholderTextColor="#BBBBBB" value={withdrawOwner} onChangeText={setWithdrawOwner} />
+									</View>
+								</View>
+								<TouchableOpacity
+									style={[styles.topupSubmitBtn, { marginTop: 16 }, withdrawLoading && { opacity: 0.6 }]}
+									onPress={handleWithdraw} disabled={withdrawLoading}
+								>
+									{withdrawLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.topupSubmitText}>Gửi yêu cầu rút tiền</Text>}
+								</TouchableOpacity>
+							</ScrollView>
+						) : (
+							<View style={styles.waitingBox}>
+								<MaterialIcons name="check-circle" size={56} color="#2E7D32" />
+								<Text style={styles.waitingTitle}>Yêu cầu đã gửi!</Text>
+								<Text style={styles.waitingDesc}>
+									Admin sẽ chuyển khoản <Text style={{ fontWeight: '800', color: '#2E7D32' }}>{withdrawResult?.amount_vnd?.toLocaleString('vi-VN')}đ</Text> đến tài khoản của bạn.
+								</Text>
+								<Text style={styles.waitingHint}>Xu đã được trừ khỏi tài khoản. Bạn sẽ nhận được thông báo khi tiền được chuyển.</Text>
+								<TouchableOpacity style={[styles.topupSubmitBtn, { marginTop: 8 }]} onPress={() => setShowWithdraw(false)}>
+									<Text style={styles.topupSubmitText}>Đóng</Text>
+								</TouchableOpacity>
+							</View>
+						)}
+					</View>
+				</View>
+			</Modal>
 
 			{/* Modal Nạp Xu */}
 			<Modal visible={showTopup} animationType="slide" transparent>
@@ -444,6 +661,8 @@ const styles = StyleSheet.create({
 	waitingTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A1A" },
 	waitingDesc: { fontSize: 14, color: "#444444", lineHeight: 22, textAlign: "center" },
 	waitingHint: { fontSize: 12, color: "#AAAAAA", textAlign: "center" },
+	withdrawLabel: { fontSize: 12, fontWeight: '600', color: '#1A1A1A', marginBottom: 4 },
+	withdrawInput: { backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: '#1A1A1A', borderWidth: 1, borderColor: '#EBEBEB' },
 });
 
 export default ProfileScreen;
