@@ -30,7 +30,7 @@ con.connect(function (err) {
             user_id INT NOT NULL,
             type VARCHAR(50) NOT NULL,
             message TEXT NOT NULL,
-            is_read TINYINT(1) DEFAULT 0,
+            is_read TINYINT DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('notifications table:', e.message); });
@@ -39,7 +39,7 @@ con.connect(function (err) {
         if (e && !e.message.includes('Duplicate column')) console.log('unlock_at col:', e.message);
     });
     // Thêm cột author_request vào users nếu chưa có
-    con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT(1) DEFAULT 0`, (e) => {
+    con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT DEFAULT 0`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('author_request col:', e.message);
     });
     // Thêm cột rejection_reason vào stories nếu chưa có

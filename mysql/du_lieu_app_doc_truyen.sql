@@ -20,7 +20,7 @@ CREATE TABLE users (
     is_vip BOOLEAN DEFAULT FALSE,
     role_id INT,
     status ENUM('active', 'banned') DEFAULT 'active',
-    author_request TINYINT(1) DEFAULT 0,
+    author_request TINYINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
@@ -100,7 +100,7 @@ CREATE TABLE notifications (
     user_id INT NOT NULL,
     type VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
-    is_read TINYINT(1) DEFAULT 0,
+    is_read TINYINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
