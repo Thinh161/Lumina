@@ -226,8 +226,8 @@ const ProfileScreen = ({ navigation }) => {
 							<View>
 								<Text style={styles.vipLabel}>Số dư tài khoản</Text>
 								<View style={styles.vipRow}>
-									<MaterialCommunityIcons name="currency-usd" size={20} color="#8B4513" />
-									<Text style={styles.vipValue}>{balanceText}</Text>
+									<MaterialCommunityIcons name="circle-multiple" size={20} color="#8B4513" />
+									<Text style={styles.vipValue}>{balanceText} xu</Text>
 								</View>
 								<Text style={styles.vipSubtitle}>Xu hiện có trong tài khoản của bạn</Text>
 							</View>
