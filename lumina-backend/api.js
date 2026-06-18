@@ -102,6 +102,9 @@ app.post('/api/login', (req, res) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         if (results.length > 0) {
             const user = results[0];
+            if (user.status === 'banned') {
+                return res.status(403).json({ status: "error", message: "Tài khoản của bạn đã bị khóa." });
+            }
             res.json({ status: "success", user });
         } else {
             res.status(401).json({ status: "error", message: "Sai tài khoản hoặc mật khẩu" });
