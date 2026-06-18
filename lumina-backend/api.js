@@ -95,6 +95,16 @@ con.connect(function (err) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('withdraw_requests table:', e.message); });
+    con.query(`ALTER TABLE chapters ADD COLUMN views INT DEFAULT 0`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('chapters.views col:', e.message);
+    });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS chapter_views (
+            user_id INT NOT NULL,
+            chapter_id INT NOT NULL,
+            PRIMARY KEY (user_id, chapter_id)
+        )
+    `, (e) => { if (e) console.log('chapter_views table:', e.message); });
     con.query(`
         CREATE TABLE IF NOT EXISTS story_categories (
             story_id INT NOT NULL,
@@ -240,6 +250,44 @@ app.get('/api/stories/search', (req, res) => {
     });
 });
 
+// 4.4b. Tăng lượt xem chương (chỉ gọi khi đọc ≥80%)
+// user_id truyền lên để dedup — mỗi user chỉ đếm 1 lần/chương
+app.put('/api/chapters/:id/view', (req, res) => {
+    const { id } = req.params;
+    const { user_id } = req.body;
+    con.query(`SELECT story_id FROM chapters WHERE id = ?`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error" });
+        const storyId = rows[0].story_id;
+
+        const doCount = () => {
+            con.query(`UPDATE chapters SET views = views + 1 WHERE id = ?`, [id], (err2) => {
+                if (err2) return res.status(500).json({ status: "error" });
+                con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(v),0) FROM (SELECT views v FROM chapters WHERE story_id = ?) t) WHERE id = ?`, [storyId, storyId], () => {});
+                con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
+                    if (!err3 && sRows[0] && sRows[0].views > 0 && sRows[0].views % 100 === 0) {
+                        const authorId = sRows[0].author_id;
+                        // Mỗi 100 view: tổng 10 xu → tác giả 7, admin 3
+                        con.query(`UPDATE users SET balance = balance + 7 WHERE id = ?`, [authorId], () => {});
+                        con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                            if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 3 WHERE id = ?`, [admins[0].id], () => {});
+                        });
+                    }
+                });
+                res.json({ status: "success" });
+            });
+        };
+
+        if (!user_id) return doCount(); // Guest: đếm 1 lần/phiên (client tự kiểm soát)
+
+        // Logged-in: chỉ đếm nếu chưa từng xem chương này
+        con.query(`INSERT IGNORE INTO chapter_views (user_id, chapter_id) VALUES (?, ?)`, [user_id, id], (err2, result) => {
+            if (err2) return res.status(500).json({ status: "error" });
+            if (result.affectedRows === 0) return res.json({ status: "already_counted" }); // đã xem rồi
+            doCount();
+        });
+    });
+});
+
 // 4.5. Trạng thái mua truyện của user
 app.get('/api/stories/:id/purchase-status', (req, res) => {
     const { id } = req.params;
@@ -267,9 +315,16 @@ app.post('/api/stories/:id/purchase', (req, res) => {
             con.query(`SELECT balance FROM users WHERE id = ?`, [user_id], (err3, users) => {
                 if (err3 || !users[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user" });
                 if (users[0].balance < story.price_xu) return res.json({ status: "error", message: `Không đủ xu. Cần ${story.price_xu} xu.` });
+                const authorShare = Math.floor(story.price_xu * 0.7);
+                const adminShare = story.price_xu - authorShare;
                 con.query(`UPDATE users SET balance = balance - ? WHERE id = ?`, [story.price_xu, user_id], (err4) => {
                     if (err4) return res.status(500).json({ status: "error", message: err4.message });
-                    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [story.price_xu, story.author_id], () => {});
+                    // 70% cho tác giả
+                    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [authorShare, story.author_id], () => {});
+                    // 30% cho admin
+                    con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                        if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [adminShare, admins[0].id], () => {});
+                    });
                     con.query(`INSERT INTO purchased_stories (user_id, story_id) VALUES (?, ?)`, [user_id, id], (err5) => {
                         if (err5) return res.status(500).json({ status: "error", message: err5.message });
                         res.json({ status: "success", message: `Đã mua "${story.title}" thành công!` });
@@ -280,20 +335,7 @@ app.post('/api/stories/:id/purchase', (req, res) => {
     });
 });
 
-// 4.4. Tăng lượt xem + doanh thu tác giả (1 xu / 10 lượt xem)
-app.put('/api/stories/:id/view', (req, res) => {
-    const { id } = req.params;
-    con.query(`UPDATE stories SET views = views + 1 WHERE id = ?`, [id], (err) => {
-        if (err) return res.status(500).json({ status: "error" });
-        // Credit tác giả 1 xu mỗi 10 lượt xem
-        con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [id], (err2, rows) => {
-            if (!err2 && rows[0] && rows[0].views % 10 === 0) {
-                con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [rows[0].author_id], () => {});
-            }
-        });
-        res.json({ status: "success" });
-    });
-});
+// 4.4. (deprecated - view tính từ chapters, không dùng nữa)
 
 // 5. Chi tiết một truyện
 app.get('/api/stories/:id', (req, res) => {
@@ -553,9 +595,11 @@ app.get('/api/author/stories/:userId', (req, res) => {
 // 20. Đăng truyện mới
 app.post('/api/stories', (req, res) => {
     const { title, description, thumbnail, author_id, category_ids, price_xu } = req.body;
+    const priceVal = parseInt(price_xu) || 0;
+    if (priceVal > 0 && priceVal < 100) return res.status(400).json({ status: "error", message: "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)." });
     con.query(
         `INSERT INTO stories (title, description, thumbnail, author_id, price_xu, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
-        [title, description, thumbnail, author_id, price_xu || 0],
+        [title, description, thumbnail, author_id, priceVal],
         (err, result) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const storyId = result.insertId;
@@ -612,9 +656,11 @@ app.put('/api/chapters/:id', (req, res) => {
 app.put('/api/stories/:id', (req, res) => {
     const { id } = req.params;
     const { title, description, thumbnail, category_ids, price_xu } = req.body;
+    const priceVal = parseInt(price_xu) || 0;
+    if (priceVal > 0 && priceVal < 100) return res.status(400).json({ status: "error", message: "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)." });
     con.query(
         `UPDATE stories SET title = ?, description = ?, thumbnail = ?, price_xu = ?, updated_at = NOW() WHERE id = ?`,
-        [title, description, thumbnail, price_xu ?? 0, id],
+        [title, description, thumbnail, priceVal, id],
         (err) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const ids = Array.isArray(category_ids) ? category_ids : [];
@@ -1105,6 +1151,73 @@ app.put('/api/admin/withdraw/:id/reject', (req, res) => {
                 () => {}
             );
             res.json({ status: "success" });
+        });
+    });
+});
+
+// ── THỐNG KÊ ADMIN ──────────────────────────────────────────────────────────
+
+// Tổng quan doanh thu admin
+app.get('/api/admin/stats', (req, res) => {
+    const queries = {
+        totalRevenue: `SELECT COALESCE(SUM(ps.story_price_xu),0) as val FROM (SELECT s.price_xu as story_price_xu FROM purchased_stories p JOIN stories s ON p.story_id = s.id) ps`,
+        adminShare: `SELECT COALESCE(SUM(FLOOR(s.price_xu * 0.3)),0) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id`,
+        totalPurchases: `SELECT COUNT(*) as val FROM purchased_stories`,
+        totalViews: `SELECT COALESCE(SUM(views),0) as val FROM stories`,
+        totalUsers: `SELECT COUNT(*) as val FROM users WHERE role_id != 1`,
+        totalStories: `SELECT COUNT(*) as val FROM stories WHERE status = 'published'`,
+        totalXuCirculating: `SELECT COALESCE(SUM(balance),0) as val FROM users`,
+        storyStats: `SELECT s.id, s.title, s.views, s.price_xu,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) as purchase_count,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) * FLOOR(s.price_xu * 0.3) as admin_earned,
+            u.full_name as author_name
+            FROM stories s LEFT JOIN users u ON s.author_id = u.id
+            WHERE s.status = 'published' ORDER BY s.views DESC`,
+        recentPurchases: `SELECT ps.purchased_at, s.title, s.price_xu, u.username as buyer, FLOOR(s.price_xu * 0.3) as admin_cut
+            FROM purchased_stories ps
+            JOIN stories s ON ps.story_id = s.id
+            JOIN users u ON ps.user_id = u.id
+            ORDER BY ps.purchased_at DESC LIMIT 20`,
+    };
+    const results = {};
+    const keys = Object.keys(queries);
+    let done = 0;
+    keys.forEach(k => {
+        con.query(queries[k], (err, rows) => {
+            if (err) results[k] = null;
+            else results[k] = rows[0]?.val !== undefined ? rows[0].val : rows;
+            if (++done === keys.length) res.json({ status: 'success', data: results });
+        });
+    });
+});
+
+// ── THỐNG KÊ TÁC GIẢ ────────────────────────────────────────────────────────
+
+// Tổng quan thu nhập tác giả
+app.get('/api/author/:id/stats', (req, res) => {
+    const { id } = req.params;
+    const queries = {
+        totalEarned: `SELECT COALESCE(SUM(FLOOR(s.price_xu * 0.7)),0) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id WHERE s.author_id = ?`,
+        totalPurchases: `SELECT COUNT(*) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id WHERE s.author_id = ?`,
+        totalViews: `SELECT COALESCE(SUM(views),0) as val FROM stories WHERE author_id = ?`,
+        storyStats: `SELECT s.id, s.title, s.views, s.price_xu, s.status,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) as purchase_count,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) * FLOOR(s.price_xu * 0.7) as earned_from_sales
+            FROM stories s WHERE s.author_id = ? ORDER BY s.views DESC`,
+        withdrawHistory: `SELECT id, amount_xu, amount_vnd, bank_name, bank_account, status, created_at FROM withdraw_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`,
+    };
+    const results = {};
+    const paramMap = {
+        totalEarned: [id], totalPurchases: [id], totalViews: [id],
+        storyStats: [id], withdrawHistory: [id],
+    };
+    const keys = Object.keys(queries);
+    let done = 0;
+    keys.forEach(k => {
+        con.query(queries[k], paramMap[k], (err, rows) => {
+            if (err) results[k] = null;
+            else results[k] = rows[0]?.val !== undefined ? rows[0].val : rows;
+            if (++done === keys.length) res.json({ status: 'success', data: results });
         });
     });
 });

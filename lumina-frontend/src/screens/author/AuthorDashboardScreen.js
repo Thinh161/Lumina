@@ -17,6 +17,9 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stories, setStories] = useState([]);
 	const [categories, setCategories] = useState([]);
 	const [loading, setLoading] = useState(true);
+	const [activeTab, setActiveTab] = useState('stories');
+	const [authorStats, setAuthorStats] = useState(null);
+	const [statsLoading, setStatsLoading] = useState(false);
 
 	// Modal đăng / sửa truyện
 	const [showStoryModal, setShowStoryModal] = useState(false);
@@ -25,7 +28,8 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stDesc, setStDesc] = useState('');
 	const [stThumb, setStThumb] = useState('');
 	const [stCatIds, setStCatIds] = useState([]);
-	const [stPriceXu, setStPriceXu] = useState('0');
+	const [stPriceXu, setStPriceXu] = useState('');
+	const [stIsPaid, setStIsPaid] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	// Modal quản lý chương
@@ -66,9 +70,20 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	useEffect(() => { loadData(); loadUnreadCount(); }, [loadData, loadUnreadCount]);
 	useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
+	const loadStats = useCallback(async () => {
+		if (!user?.id) return;
+		setStatsLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/author/${user.id}/stats`).then(r => r.json());
+			if (res.status === 'success') setAuthorStats(res.data);
+		} finally { setStatsLoading(false); }
+	}, [user?.id]);
+
+	useEffect(() => { if (activeTab === 'income') loadStats(); }, [activeTab, loadStats]);
+
 	const openNewStory = () => {
 		setEditingStory(null);
-		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu('0');
+		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu(''); setStIsPaid(false);
 		setShowStoryModal(true);
 	};
 
@@ -78,12 +93,16 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 		setStDesc(story.description || '');
 		setStThumb(story.thumbnail || '');
 		setStCatIds(story.category_ids ? story.category_ids.split(',').map(Number) : []);
-		setStPriceXu(String(story.price_xu || 0));
+		const paid = (story.price_xu || 0) > 0;
+		setStIsPaid(paid);
+		setStPriceXu(paid ? String(story.price_xu) : '');
 		setShowStoryModal(true);
 	};
 
 	const handleSubmitStory = async () => {
 		if (!stTitle.trim() || stCatIds.length === 0) { Alert.alert("Lỗi", "Cần nhập tên và chọn ít nhất 1 thể loại."); return; }
+		const priceVal = stIsPaid ? (parseInt(stPriceXu) || 0) : 0;
+		if (stIsPaid && priceVal < 100) { Alert.alert("Lỗi", "Giá tối thiểu là 100 xu."); return; }
 		setSubmitting(true);
 		try {
 			let res;
@@ -91,13 +110,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				res = await fetch(`${API_URL}/stories/${editingStory.id}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: priceVal }),
 				}).then(r => r.json());
 			} else {
 				res = await fetch(`${API_URL}/stories`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: priceVal }),
 				}).then(r => r.json());
 			}
 			if (res.status === "success") {
@@ -247,7 +266,21 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				</View>
 			</View>
 
-			{loading ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
+			{/* Tab bar */}
+			<View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+				{[{ key: 'stories', label: 'Truyện của tôi' }, { key: 'income', label: 'Thu Nhập' }].map(t => (
+					<TouchableOpacity
+						key={t.key}
+						style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: activeTab === t.key ? '#8B4513' : 'transparent' }}
+						onPress={() => setActiveTab(t.key)}
+					>
+						<Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === t.key ? '#8B4513' : '#888' }}>{t.label}</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+
+			{activeTab === 'stories' ? (
+				loading ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 				: stories.length === 0 ? (
 					<View style={s.center}>
 						<MaterialIcons name="auto-stories" size={52} color="#DDDDDD" />
@@ -255,7 +288,96 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 					</View>
 				) : (
 					<FlatList data={stories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} />
-				)}
+				)
+			) : (
+				/* Tab Thu Nhập */
+				statsLoading || !authorStats ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
+				: <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+					{/* Chính sách doanh thu */}
+					<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFF8E1', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFE082' }}>
+						<MaterialIcons name="info-outline" size={18} color="#E65100" style={{ marginTop: 1 }} />
+						<View style={{ flex: 1, gap: 4 }}>
+							<Text style={{ fontSize: 13, fontWeight: '700', color: '#E65100' }}>Chính sách doanh thu</Text>
+							<Text style={{ fontSize: 12, color: '#5D4037', lineHeight: 18 }}>
+								{'• Mua truyện: bạn nhận '}
+								<Text style={{ fontWeight: '700' }}>70%</Text>
+								{', nền tảng giữ '}
+								<Text style={{ fontWeight: '700' }}>30%</Text>
+								{'\n• Lượt xem: cứ 100 lượt bạn nhận '}
+								<Text style={{ fontWeight: '700' }}>7 xu</Text>
+								{', nền tảng nhận 3 xu\n• Phần giữ lại dùng để duy trì và phát triển app'}
+							</Text>
+						</View>
+					</View>
+
+					{/* Tổng quan */}
+					<View style={{ flexDirection: 'row', gap: 10 }}>
+						{[
+							{ label: 'Từ bán truyện', value: `${authorStats.totalEarned || 0} xu`, icon: 'shopping-cart', color: '#2E7D32' },
+							{ label: 'Tổng lượt xem', value: String(authorStats.totalViews || 0), icon: 'visibility', color: '#1565C0' },
+							{ label: 'Lượt mua', value: String(authorStats.totalPurchases || 0), icon: 'receipt', color: '#E65100' },
+						].map(card => (
+							<View key={card.label} style={{ flex: 1, backgroundColor: '#FFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#F0F0F0', gap: 4, alignItems: 'center' }}>
+								<MaterialIcons name={card.icon} size={20} color={card.color} />
+								<Text style={{ fontSize: 15, fontWeight: '800', color: '#1A1A1A' }}>{card.value}</Text>
+								<Text style={{ fontSize: 10, color: '#888', textAlign: 'center' }}>{card.label}</Text>
+							</View>
+						))}
+					</View>
+
+					{/* Theo từng truyện */}
+					<Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>Chi tiết từng truyện</Text>
+					{(authorStats.storyStats || []).length === 0
+						? <Text style={{ color: '#888', fontSize: 13 }}>Chưa có truyện nào.</Text>
+						: (authorStats.storyStats || []).map(st => (
+							<View key={st.id} style={{ backgroundColor: '#FFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#F0F0F0', gap: 8 }}>
+								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+									<Text style={{ fontSize: 13, fontWeight: '700', color: '#1A1A1A', flex: 1 }} numberOfLines={1}>{st.title}</Text>
+									<View style={{ backgroundColor: st.price_xu > 0 ? '#FFF8E1' : '#F5F5F5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+										<Text style={{ fontSize: 10, fontWeight: '700', color: st.price_xu > 0 ? '#8B4513' : '#888' }}>{st.price_xu > 0 ? `${st.price_xu} xu` : 'Miễn phí'}</Text>
+									</View>
+								</View>
+								<View style={{ flexDirection: 'row', gap: 16 }}>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#1565C0' }}>{st.views || 0}</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Lượt xem</Text>
+									</View>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#E65100' }}>{st.purchase_count || 0}</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Lượt mua</Text>
+									</View>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#2E7D32' }}>{st.earned_from_sales || 0} xu</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Thu từ bán (70%)</Text>
+									</View>
+								</View>
+							</View>
+						))
+					}
+
+					{/* Lịch sử rút tiền */}
+					<Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>Lịch sử rút tiền</Text>
+					{(authorStats.withdrawHistory || []).length === 0
+						? <Text style={{ color: '#888', fontSize: 13 }}>Chưa có lịch sử rút tiền.</Text>
+						: (authorStats.withdrawHistory || []).map(w => {
+							const statusColor = { pending: '#E65100', approved: '#2E7D32', rejected: '#D32F2F' }[w.status];
+							const statusLabel = { pending: 'Đang xử lý', approved: 'Đã chuyển khoản', rejected: 'Bị từ chối' }[w.status];
+							return (
+								<View key={w.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#F0F0F0' }}>
+									<View style={{ gap: 3 }}>
+										<Text style={{ fontSize: 13, fontWeight: '700', color: '#1A1A1A' }}>{w.amount_xu} xu → {Number(w.amount_vnd).toLocaleString('vi-VN')}đ</Text>
+										<Text style={{ fontSize: 11, color: '#888' }}>{w.bank_name} · {w.bank_account}</Text>
+										<Text style={{ fontSize: 11, color: '#888' }}>{new Date(w.created_at).toLocaleDateString('vi-VN')}</Text>
+									</View>
+									<View style={{ backgroundColor: statusColor + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+										<Text style={{ fontSize: 11, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
+									</View>
+								</View>
+							);
+						})
+					}
+				</ScrollView>
+			)}
 
 			{/* Modal đăng / sửa truyện */}
 			<Modal visible={showStoryModal} animationType="slide" transparent>
@@ -283,11 +405,40 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
 							</View>
 							<View style={s.field}>
-								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí</Text>
-								<TextInput
-									style={s.input} value={stPriceXu} onChangeText={setStPriceXu}
-									placeholder="0" placeholderTextColor="#BBBBBB" keyboardType="numeric"
-								/>
+								<Text style={s.fieldLabel}>Loại truyện</Text>
+								<View style={{ flexDirection: 'row', gap: 8 }}>
+									<TouchableOpacity
+										style={[s.chip, !stIsPaid && s.chipActive]}
+										onPress={() => { setStIsPaid(false); setStPriceXu(''); }}
+									>
+										<Text style={[s.chipText, !stIsPaid && s.chipTextActive]}>Miễn phí</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[s.chip, stIsPaid && s.chipActive]}
+										onPress={() => setStIsPaid(true)}
+									>
+										<Text style={[s.chipText, stIsPaid && s.chipTextActive]}>Trả phí</Text>
+									</TouchableOpacity>
+								</View>
+								{stIsPaid && (
+									<>
+										<TextInput
+											style={[s.input, { marginTop: 8 }, (parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100) && { borderColor: '#D32F2F' }]}
+											value={stPriceXu} onChangeText={setStPriceXu}
+											placeholder="Nhập giá (tối thiểu 100 xu)" placeholderTextColor="#BBBBBB" keyboardType="numeric"
+										/>
+										{parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100 && (
+											<Text style={{ color: '#D32F2F', fontSize: 11, marginTop: 2 }}>Tối thiểu 100 xu</Text>
+										)}
+										<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#FFF8E1', borderRadius: 8, padding: 10, marginTop: 8 }}>
+											<MaterialIcons name="info-outline" size={14} color="#E65100" style={{ marginTop: 1 }} />
+											<Text style={{ fontSize: 11, color: '#E65100', flex: 1, lineHeight: 16 }}>
+												Nền tảng giữ lại <Text style={{ fontWeight: '700' }}>30%</Text> doanh thu để duy trì app. Bạn nhận <Text style={{ fontWeight: '700' }}>70%</Text> trên mỗi lượt mua.
+												{parseInt(stPriceXu) >= 100 ? `\nVí dụ: ${stPriceXu} xu → bạn nhận ${Math.floor(parseInt(stPriceXu) * 0.7)} xu.` : ''}
+											</Text>
+										</View>
+									</>
+								)}
 							</View>
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Thể loại *</Text>

@@ -34,6 +34,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	const scrollPositionRef = useRef(0);
 	const [progress, setProgress] = useState(0);
 	const contentHeightRef = useRef(0);
+	const viewCountedRef = useRef(false);
 	const screenHeight = Dimensions.get('window').height;
 
 	const [fontSize, setFontSize] = useState(16);
@@ -75,6 +76,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 
 	useEffect(() => {
 		if (chapterId) {
+			viewCountedRef.current = false;
 			dispatch(fetchChapterContent({ chapterId, userId: user?.id }));
 		}
 		return () => {
@@ -150,7 +152,16 @@ const ChapterReadScreen = ({ navigation, route }) => {
 						const offset = e.nativeEvent.contentOffset.y;
 						scrollPositionRef.current = offset;
 						const scrollable = contentHeightRef.current - screenHeight;
-						if (scrollable > 0) setProgress(Math.min(1, offset / scrollable));
+						const p = scrollable > 0 ? Math.min(1, offset / scrollable) : 0;
+						setProgress(p);
+						if (p >= 0.8 && !viewCountedRef.current) {
+							viewCountedRef.current = true;
+							fetch(`${API_URL}/chapters/${chapterId}/view`, {
+								method: 'PUT',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ user_id: user?.id || null }),
+							}).catch(() => {});
+						}
 					}}
 					scrollEventThrottle={200}
 				>
