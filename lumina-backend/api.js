@@ -583,9 +583,11 @@ app.get('/api/author/stories/:userId', (req, res) => {
 // 20. Đăng truyện mới
 app.post('/api/stories', (req, res) => {
     const { title, description, thumbnail, author_id, category_ids, price_xu } = req.body;
+    const priceVal = parseInt(price_xu) || 0;
+    if (priceVal > 0 && priceVal < 100) return res.status(400).json({ status: "error", message: "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)." });
     con.query(
         `INSERT INTO stories (title, description, thumbnail, author_id, price_xu, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
-        [title, description, thumbnail, author_id, price_xu || 0],
+        [title, description, thumbnail, author_id, priceVal],
         (err, result) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const storyId = result.insertId;
@@ -642,9 +644,11 @@ app.put('/api/chapters/:id', (req, res) => {
 app.put('/api/stories/:id', (req, res) => {
     const { id } = req.params;
     const { title, description, thumbnail, category_ids, price_xu } = req.body;
+    const priceVal = parseInt(price_xu) || 0;
+    if (priceVal > 0 && priceVal < 100) return res.status(400).json({ status: "error", message: "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)." });
     con.query(
         `UPDATE stories SET title = ?, description = ?, thumbnail = ?, price_xu = ?, updated_at = NOW() WHERE id = ?`,
-        [title, description, thumbnail, price_xu ?? 0, id],
+        [title, description, thumbnail, priceVal, id],
         (err) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const ids = Array.isArray(category_ids) ? category_ids : [];

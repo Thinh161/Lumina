@@ -84,6 +84,8 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 
 	const handleSubmitStory = async () => {
 		if (!stTitle.trim() || stCatIds.length === 0) { Alert.alert("Lỗi", "Cần nhập tên và chọn ít nhất 1 thể loại."); return; }
+		const priceVal = parseInt(stPriceXu) || 0;
+		if (priceVal > 0 && priceVal < 100) { Alert.alert("Lỗi", "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)."); return; }
 		setSubmitting(true);
 		try {
 			let res;
@@ -283,11 +285,15 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
 							</View>
 							<View style={s.field}>
-								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí</Text>
+								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí, tối thiểu 100 xu</Text>
 								<TextInput
-									style={s.input} value={stPriceXu} onChangeText={setStPriceXu}
+									style={[s.input, (parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100) && { borderColor: '#D32F2F' }]}
+									value={stPriceXu} onChangeText={setStPriceXu}
 									placeholder="0" placeholderTextColor="#BBBBBB" keyboardType="numeric"
 								/>
+								{parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100 && (
+									<Text style={{ color: '#D32F2F', fontSize: 11, marginTop: 2 }}>Tối thiểu 100 xu</Text>
+								)}
 							</View>
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Thể loại *</Text>
