@@ -21,8 +21,8 @@ con.connect(function (err) {
     // Dọn bảng không dùng
     con.query(`DROP TABLE IF EXISTS purchased_chapters`, (e) => { if (e) console.log('drop purchased_chapters:', e.message); });
     con.query(`DROP TABLE IF EXISTS transactions`, (e) => { if (e) console.log('drop transactions:', e.message); });
-    con.query(`ALTER TABLE chapters DROP COLUMN IF EXISTS is_vip`, (e) => {
-        if (e && !e.message.includes("check that column/key exists")) console.log('drop is_vip col:', e.message);
+    con.query(`ALTER TABLE chapters DROP COLUMN is_vip`, (e) => {
+        if (e && !e.message.includes("check that column/key exists") && !e.message.includes("Can't DROP")) console.log('drop is_vip col:', e.message);
     });
     con.query(`
         CREATE TABLE IF NOT EXISTS notifications (
