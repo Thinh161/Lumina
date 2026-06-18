@@ -81,6 +81,15 @@ CREATE TABLE chapters (
     FOREIGN KEY (story_id) REFERENCES stories(id)
 );
 
+-- 5.1. Dedup lượt xem chương (mỗi user chỉ đếm 1 lần/chương)
+CREATE TABLE chapter_views (
+    user_id INT NOT NULL,
+    chapter_id INT NOT NULL,
+    PRIMARY KEY (user_id, chapter_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id)
+);
+
 -- 6. Bảng Thư viện
 CREATE TABLE library (
     user_id INT,

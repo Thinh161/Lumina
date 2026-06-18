@@ -99,6 +99,13 @@ con.connect(function (err) {
         if (e && !e.message.includes('Duplicate column')) console.log('chapters.views col:', e.message);
     });
     con.query(`
+        CREATE TABLE IF NOT EXISTS chapter_views (
+            user_id INT NOT NULL,
+            chapter_id INT NOT NULL,
+            PRIMARY KEY (user_id, chapter_id)
+        )
+    `, (e) => { if (e) console.log('chapter_views table:', e.message); });
+    con.query(`
         CREATE TABLE IF NOT EXISTS story_categories (
             story_id INT NOT NULL,
             category_id INT NOT NULL,
@@ -243,23 +250,35 @@ app.get('/api/stories/search', (req, res) => {
     });
 });
 
-// 4.4b. Tăng lượt xem chương (chỉ gọi khi đọc ≥80%) — cộng vào story.views + doanh thu tác giả
+// 4.4b. Tăng lượt xem chương (chỉ gọi khi đọc ≥80%)
+// user_id truyền lên để dedup — mỗi user chỉ đếm 1 lần/chương
 app.put('/api/chapters/:id/view', (req, res) => {
     const { id } = req.params;
+    const { user_id } = req.body;
     con.query(`SELECT story_id FROM chapters WHERE id = ?`, [id], (err, rows) => {
         if (err || !rows[0]) return res.status(404).json({ status: "error" });
         const storyId = rows[0].story_id;
-        con.query(`UPDATE chapters SET views = views + 1 WHERE id = ?`, [id], (err2) => {
-            if (err2) return res.status(500).json({ status: "error" });
-            // Cập nhật story.views = tổng views của các chương
-            con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(views),0) FROM chapters WHERE story_id = ?) WHERE id = ?`, [storyId, storyId], () => {});
-            // Doanh thu tác giả: 1 xu mỗi 10 lượt xem chapter
-            con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
-                if (!err3 && sRows[0] && sRows[0].views % 10 === 0 && sRows[0].views > 0) {
-                    con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [sRows[0].author_id], () => {});
-                }
+
+        const doCount = () => {
+            con.query(`UPDATE chapters SET views = views + 1 WHERE id = ?`, [id], (err2) => {
+                if (err2) return res.status(500).json({ status: "error" });
+                con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(v),0) FROM (SELECT views v FROM chapters WHERE story_id = ?) t) WHERE id = ?`, [storyId, storyId], () => {});
+                con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
+                    if (!err3 && sRows[0] && sRows[0].views % 10 === 0 && sRows[0].views > 0) {
+                        con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [sRows[0].author_id], () => {});
+                    }
+                });
+                res.json({ status: "success" });
             });
-            res.json({ status: "success" });
+        };
+
+        if (!user_id) return doCount(); // Guest: đếm 1 lần/phiên (client tự kiểm soát)
+
+        // Logged-in: chỉ đếm nếu chưa từng xem chương này
+        con.query(`INSERT IGNORE INTO chapter_views (user_id, chapter_id) VALUES (?, ?)`, [user_id, id], (err2, result) => {
+            if (err2) return res.status(500).json({ status: "error" });
+            if (result.affectedRows === 0) return res.json({ status: "already_counted" }); // đã xem rồi
+            doCount();
         });
     });
 });

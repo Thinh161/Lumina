@@ -156,7 +156,11 @@ const ChapterReadScreen = ({ navigation, route }) => {
 						setProgress(p);
 						if (p >= 0.8 && !viewCountedRef.current) {
 							viewCountedRef.current = true;
-							fetch(`${API_URL}/chapters/${chapterId}/view`, { method: 'PUT' }).catch(() => {});
+							fetch(`${API_URL}/chapters/${chapterId}/view`, {
+								method: 'PUT',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ user_id: user?.id || null }),
+							}).catch(() => {});
 						}
 					}}
 					scrollEventThrottle={200}
