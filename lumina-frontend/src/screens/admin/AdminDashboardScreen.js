@@ -30,6 +30,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 	const [rejectReason, setRejectReason] = useState('');
 	const [rejecting, setRejecting] = useState(false);
 	const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', onOk: null, destructive: false });
+	const [adminStats, setAdminStats] = useState(null);
 
 	const confirm = (title, msg, onOk, destructive = false) => {
 		setConfirmModal({ visible: true, title, message: msg, onOk, destructive });
@@ -58,6 +59,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 			} else if (tab === 'withdraw') {
 				const res = await fetch(`${API_URL}/admin/withdrawals?status=${withdrawFilter}`).then(r => r.json());
 				setWithdrawRequests(res.data || []);
+			} else if (tab === 'stats') {
+				const res = await fetch(`${API_URL}/admin/stats`).then(r => r.json());
+				setAdminStats(res.data || null);
 			} else {
 				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
 				setUsers((res.data || []).filter(u => u.role_id !== 1));
@@ -436,6 +440,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 		{ key: 'topup', label: `Nạp xu${topupRequests.filter(r => r.status === 'pending').length > 0 ? ` (${topupRequests.filter(r => r.status === 'pending').length})` : ''}` },
 		{ key: 'vip', label: `VIP${pendingVipCount > 0 ? ` (${pendingVipCount})` : ''}` },
 		{ key: 'withdraw', label: `Rút${pendingWithdrawCount > 0 ? ` (${pendingWithdrawCount})` : ''}` },
+		{ key: 'stats', label: 'Thống Kê' },
 	];
 
 	const filterOptions = {
@@ -508,6 +513,73 @@ const AdminDashboardScreen = ({ navigation }) => {
 				withdrawRequests.length === 0
 					? <View style={s.center}><MaterialIcons name="account-balance" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu rút tiền nào.</Text></View>
 					: <FlatList data={withdrawRequests} keyExtractor={i => String(i.id)} renderItem={renderWithdrawRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+			) : tab === 'stats' ? (
+				!adminStats
+					? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
+					: <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />}>
+						{/* Thẻ tổng quan */}
+						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+							{[
+								{ label: 'Doanh thu (mua)', value: `${Math.floor(adminStats.adminShare)} xu`, icon: 'shopping-cart', color: '#2E7D32' },
+								{ label: 'Tổng lượt xem', value: String(adminStats.totalViews || 0), icon: 'visibility', color: '#1565C0' },
+								{ label: 'Lượt mua truyện', value: String(adminStats.totalPurchases || 0), icon: 'receipt', color: '#E65100' },
+								{ label: 'Xu lưu hành', value: `${Math.floor(adminStats.totalXuCirculating)} xu`, icon: 'account-balance-wallet', color: '#6A1B9A' },
+								{ label: 'Người dùng', value: String(adminStats.totalUsers || 0), icon: 'group', color: '#00695C' },
+								{ label: 'Truyện đã duyệt', value: String(adminStats.totalStories || 0), icon: 'menu-book', color: '#8B4513' },
+							].map(card => (
+								<View key={card.label} style={{ width: '47%', backgroundColor: '#FFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#F0F0F0', gap: 6 }}>
+									<MaterialIcons name={card.icon} size={22} color={card.color} />
+									<Text style={{ fontSize: 18, fontWeight: '800', color: '#1A1A1A' }}>{card.value}</Text>
+									<Text style={{ fontSize: 11, color: '#888' }}>{card.label}</Text>
+								</View>
+							))}
+						</View>
+
+						{/* Thống kê theo truyện */}
+						<Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>Doanh thu theo truyện</Text>
+						{(adminStats.storyStats || []).map(s => (
+							<View key={s.id} style={{ backgroundColor: '#FFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#F0F0F0', gap: 6 }}>
+								<Text style={{ fontSize: 13, fontWeight: '700', color: '#1A1A1A' }} numberOfLines={1}>{s.title}</Text>
+								<Text style={{ fontSize: 11, color: '#8B4513' }}>{s.author_name}</Text>
+								<View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#1565C0' }}>{s.views || 0}</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Lượt xem</Text>
+									</View>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#E65100' }}>{s.purchase_count || 0}</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Lượt mua</Text>
+									</View>
+									<View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#2E7D32' }}>{s.admin_earned || 0} xu</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Admin nhận (30%)</Text>
+									</View>
+									{s.price_xu > 0 && <View style={{ alignItems: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: '800', color: '#8B4513' }}>{s.price_xu} xu</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>Giá bán</Text>
+									</View>}
+								</View>
+							</View>
+						))}
+
+						{/* Giao dịch gần đây */}
+						<Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>Giao dịch gần đây</Text>
+						{(adminStats.recentPurchases || []).length === 0
+							? <Text style={{ color: '#888', fontSize: 13 }}>Chưa có giao dịch.</Text>
+							: (adminStats.recentPurchases || []).map((p, i) => (
+								<View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+									<View style={{ flex: 1 }}>
+										<Text style={{ fontSize: 13, fontWeight: '600', color: '#1A1A1A' }} numberOfLines={1}>{p.title}</Text>
+										<Text style={{ fontSize: 11, color: '#888' }}>{p.buyer} · {new Date(p.purchased_at).toLocaleDateString('vi-VN')}</Text>
+									</View>
+									<View style={{ alignItems: 'flex-end' }}>
+										<Text style={{ fontSize: 13, fontWeight: '700', color: '#2E7D32' }}>+{p.admin_cut} xu</Text>
+										<Text style={{ fontSize: 10, color: '#888' }}>{p.price_xu} xu tổng</Text>
+									</View>
+								</View>
+							))
+						}
+					</ScrollView>
 			) : (
 				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			)}

@@ -1157,6 +1157,73 @@ app.put('/api/admin/withdraw/:id/reject', (req, res) => {
     });
 });
 
+// ── THỐNG KÊ ADMIN ──────────────────────────────────────────────────────────
+
+// Tổng quan doanh thu admin
+app.get('/api/admin/stats', (req, res) => {
+    const queries = {
+        totalRevenue: `SELECT COALESCE(SUM(ps.story_price_xu),0) as val FROM (SELECT s.price_xu as story_price_xu FROM purchased_stories p JOIN stories s ON p.story_id = s.id) ps`,
+        adminShare: `SELECT COALESCE(SUM(FLOOR(s.price_xu * 0.3)),0) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id`,
+        totalPurchases: `SELECT COUNT(*) as val FROM purchased_stories`,
+        totalViews: `SELECT COALESCE(SUM(views),0) as val FROM stories`,
+        totalUsers: `SELECT COUNT(*) as val FROM users WHERE role_id != 1`,
+        totalStories: `SELECT COUNT(*) as val FROM stories WHERE status = 'published'`,
+        totalXuCirculating: `SELECT COALESCE(SUM(balance),0) as val FROM users`,
+        storyStats: `SELECT s.id, s.title, s.views, s.price_xu,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) as purchase_count,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) * FLOOR(s.price_xu * 0.3) as admin_earned,
+            u.full_name as author_name
+            FROM stories s LEFT JOIN users u ON s.author_id = u.id
+            WHERE s.status = 'published' ORDER BY s.views DESC`,
+        recentPurchases: `SELECT ps.purchased_at, s.title, s.price_xu, u.username as buyer, FLOOR(s.price_xu * 0.3) as admin_cut
+            FROM purchased_stories ps
+            JOIN stories s ON ps.story_id = s.id
+            JOIN users u ON ps.user_id = u.id
+            ORDER BY ps.purchased_at DESC LIMIT 20`,
+    };
+    const results = {};
+    const keys = Object.keys(queries);
+    let done = 0;
+    keys.forEach(k => {
+        con.query(queries[k], (err, rows) => {
+            if (err) results[k] = null;
+            else results[k] = rows[0]?.val !== undefined ? rows[0].val : rows;
+            if (++done === keys.length) res.json({ status: 'success', data: results });
+        });
+    });
+});
+
+// ── THỐNG KÊ TÁC GIẢ ────────────────────────────────────────────────────────
+
+// Tổng quan thu nhập tác giả
+app.get('/api/author/:id/stats', (req, res) => {
+    const { id } = req.params;
+    const queries = {
+        totalEarned: `SELECT COALESCE(SUM(FLOOR(s.price_xu * 0.7)),0) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id WHERE s.author_id = ?`,
+        totalPurchases: `SELECT COUNT(*) as val FROM purchased_stories ps JOIN stories s ON ps.story_id = s.id WHERE s.author_id = ?`,
+        totalViews: `SELECT COALESCE(SUM(views),0) as val FROM stories WHERE author_id = ?`,
+        storyStats: `SELECT s.id, s.title, s.views, s.price_xu, s.status,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) as purchase_count,
+            (SELECT COUNT(*) FROM purchased_stories ps WHERE ps.story_id = s.id) * FLOOR(s.price_xu * 0.7) as earned_from_sales
+            FROM stories s WHERE s.author_id = ? ORDER BY s.views DESC`,
+        withdrawHistory: `SELECT id, amount_xu, amount_vnd, bank_name, bank_account, status, created_at FROM withdraw_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`,
+    };
+    const results = {};
+    const paramMap = {
+        totalEarned: [id], totalPurchases: [id], totalViews: [id],
+        storyStats: [id], withdrawHistory: [id],
+    };
+    const keys = Object.keys(queries);
+    let done = 0;
+    keys.forEach(k => {
+        con.query(queries[k], paramMap[k], (err, rows) => {
+            if (err) results[k] = null;
+            else results[k] = rows[0]?.val !== undefined ? rows[0].val : rows;
+            if (++done === keys.length) res.json({ status: 'success', data: results });
+        });
+    });
+});
+
 // Server
 var server = app.listen(5555, "0.0.0.0", function () {
     console.log("App listening at port 5555");
