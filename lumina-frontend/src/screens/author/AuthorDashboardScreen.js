@@ -25,6 +25,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stDesc, setStDesc] = useState('');
 	const [stThumb, setStThumb] = useState('');
 	const [stCatIds, setStCatIds] = useState([]);
+	const [stPriceXu, setStPriceXu] = useState('0');
 	const [submitting, setSubmitting] = useState(false);
 
 	// Modal quản lý chương
@@ -67,7 +68,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 
 	const openNewStory = () => {
 		setEditingStory(null);
-		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]);
+		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu('0');
 		setShowStoryModal(true);
 	};
 
@@ -77,6 +78,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 		setStDesc(story.description || '');
 		setStThumb(story.thumbnail || '');
 		setStCatIds(story.category_ids ? story.category_ids.split(',').map(Number) : []);
+		setStPriceXu(String(story.price_xu || 0));
 		setShowStoryModal(true);
 	};
 
@@ -89,13 +91,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				res = await fetch(`${API_URL}/stories/${editingStory.id}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
 				}).then(r => r.json());
 			} else {
 				res = await fetch(`${API_URL}/stories`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
 				}).then(r => r.json());
 			}
 			if (res.status === "success") {
@@ -279,6 +281,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Mô tả</Text>
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
+							</View>
+							<View style={s.field}>
+								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí</Text>
+								<TextInput
+									style={s.input} value={stPriceXu} onChangeText={setStPriceXu}
+									placeholder="0" placeholderTextColor="#BBBBBB" keyboardType="numeric"
+								/>
 							</View>
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Thể loại *</Text>

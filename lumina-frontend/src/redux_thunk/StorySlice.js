@@ -63,6 +63,8 @@ export const fetchChapterContent = createAsyncThunk("story/fetchChapterContent",
 			if (userId) url += `?user_id=${userId}`;
 			const response = await fetch(url);
 			const data = await response.json();
+			if (response.status === 403 && data.code === 'PURCHASE_REQUIRED')
+				return rejectWithValue({ code: 'PURCHASE_REQUIRED', message: data.message, price_xu: data.price_xu, story_id: data.story_id });
 			if (response.status === 403 || data.code === 'VIP_REQUIRED')
 				return rejectWithValue({ code: 'VIP_REQUIRED', message: data.message });
 			if (data.status === "success") return data.data;
@@ -85,6 +87,8 @@ const storySlice = createSlice({
 		error: null,
 		vipBlocked: false,
 		vipBlockedMessage: '',
+		purchaseBlocked: false,
+		purchaseBlockedData: null,
 	},
 	reducers: {
 		clearCurrentStory: (state) => {
@@ -95,6 +99,8 @@ const storySlice = createSlice({
 			state.currentChapterContent = null;
 			state.vipBlocked = false;
 			state.vipBlockedMessage = '';
+			state.purchaseBlocked = false;
+			state.purchaseBlockedData = null;
 		}
 	},
 	extraReducers: (builder) => {
@@ -144,6 +150,8 @@ const storySlice = createSlice({
 				state.loading = true;
 				state.vipBlocked = false;
 				state.vipBlockedMessage = '';
+				state.purchaseBlocked = false;
+				state.purchaseBlockedData = null;
 			})
 			.addCase(fetchChapterContent.fulfilled, (state, action) => {
 				state.loading = false;
@@ -155,6 +163,9 @@ const storySlice = createSlice({
 				if (action.payload?.code === 'VIP_REQUIRED') {
 					state.vipBlocked = true;
 					state.vipBlockedMessage = action.payload?.message || '';
+				} else if (action.payload?.code === 'PURCHASE_REQUIRED') {
+					state.purchaseBlocked = true;
+					state.purchaseBlockedData = { price_xu: action.payload.price_xu, story_id: action.payload.story_id };
 				}
 			});
 	}

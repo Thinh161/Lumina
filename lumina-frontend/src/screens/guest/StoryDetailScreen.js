@@ -43,6 +43,11 @@ const StoryDetailScreen = ({ navigation, route }) => {
 	const [showAllChapters, setShowAllChapters] = useState(false);
 	const CHAPTERS_PREVIEW = 5;
 
+	const [priceXu, setPriceXu] = useState(0);
+	const [hasPurchased, setHasPurchased] = useState(false);
+	const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+	const [purchaseLoading, setPurchaseLoading] = useState(false);
+
 	const loadComments = useCallback(async () => {
 		if (!storyId) return;
 		try {
@@ -66,9 +71,44 @@ const StoryDetailScreen = ({ navigation, route }) => {
 			loadComments();
 			loadBookmark();
 			fetch(`${API_URL}/stories/${storyId}/view`, { method: 'PUT' }).catch(() => {});
+			// Lấy trạng thái mua truyện
+			const uid = user?.id ? `?user_id=${user.id}` : '';
+			fetch(`${API_URL}/stories/${storyId}/purchase-status${uid}`)
+				.then(r => r.json())
+				.then(d => { if (d.status === 'success') { setPriceXu(d.price_xu || 0); setHasPurchased(d.has_purchased); } })
+				.catch(() => {});
 		}
 		return () => { dispatch(clearCurrentStory()); };
-	}, [dispatch, storyId, loadComments, loadBookmark]);
+	}, [dispatch, storyId, loadComments, loadBookmark, user?.id]);
+
+	// Mở modal mua khi được redirect từ ChapterReadScreen
+	useEffect(() => {
+		if (route.params?.showPurchase && priceXu > 0 && !hasPurchased) {
+			setShowPurchaseModal(true);
+		}
+	}, [route.params?.showPurchase, priceXu, hasPurchased]);
+
+	const handlePurchaseStory = async () => {
+		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để mua truyện."); return; }
+		setPurchaseLoading(true);
+		try {
+			const res = await fetch(`${API_URL}/stories/${storyId}/purchase`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ user_id: user.id }),
+			}).then(r => r.json());
+			if (res.status === 'success') {
+				setHasPurchased(true);
+				setShowPurchaseModal(false);
+				Alert.alert("Thành công", res.message);
+			} else {
+				Alert.alert("Lỗi", res.message);
+			}
+		} catch { Alert.alert("Lỗi", "Không thể kết nối."); }
+		finally { setPurchaseLoading(false); }
+	};
+
+	const canRead = !priceXu || hasPurchased || user?.is_vip || user?.role_id === 1 || user?.role_id === 2;
 
 	const handlePostComment = async () => {
 		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để bình luận."); return; }
@@ -185,7 +225,15 @@ const StoryDetailScreen = ({ navigation, route }) => {
 					</View>
 
 					<View style={styles.actionsRow}>
-						{bookmark ? (
+						{priceXu > 0 && !canRead ? (
+							<TouchableOpacity
+								style={[styles.actionButton, styles.actionPrimary, { backgroundColor: '#C0392B' }]}
+								onPress={() => setShowPurchaseModal(true)}
+							>
+								<MaterialIcons name="lock" size={18} color="#FFFFFF" />
+								<Text style={styles.actionPrimaryText}>Mua truyện — {priceXu} xu</Text>
+							</TouchableOpacity>
+						) : bookmark ? (
 							<TouchableOpacity
 								style={[styles.actionButton, styles.actionPrimary]}
 								onPress={() => navigation.navigate("ChapterRead", { chapterId: bookmark.chapter_id, storyId: currentStory.id })}
@@ -407,6 +455,49 @@ const StoryDetailScreen = ({ navigation, route }) => {
 					</TouchableOpacity>
 				)}
 			</View>
+
+			{/* Modal mua truyện */}
+			{showPurchaseModal && (
+				<View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+					<View style={{ backgroundColor: '#FFF', borderRadius: 16, padding: 24, width: '100%', gap: 14 }}>
+						<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+							<Text style={{ fontSize: 17, fontWeight: '700', color: '#1A1A1A' }}>Mua truyện</Text>
+							<TouchableOpacity onPress={() => setShowPurchaseModal(false)}>
+								<MaterialIcons name="close" size={22} color="#888" />
+							</TouchableOpacity>
+						</View>
+						<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 12 }}>
+							<MaterialIcons name="lock-open" size={24} color="#8B4513" />
+							<Text style={{ fontSize: 13, color: '#5D2E0C', flex: 1 }}>Mua một lần để đọc toàn bộ nội dung truyện này vĩnh viễn</Text>
+						</View>
+						<View style={{ backgroundColor: '#F5F0EB', borderRadius: 10, padding: 12, gap: 8 }}>
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+								<Text style={{ color: '#666', fontSize: 14 }}>Giá</Text>
+								<Text style={{ fontWeight: '700', color: '#8B4513', fontSize: 14 }}>{priceXu} xu</Text>
+							</View>
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+								<Text style={{ color: '#666', fontSize: 14 }}>Số dư</Text>
+								<Text style={{ fontWeight: '700', fontSize: 14, color: (user?.balance || 0) >= priceXu ? '#2E7D32' : '#D32F2F' }}>
+									{Math.floor(user?.balance || 0)} xu
+								</Text>
+							</View>
+						</View>
+						{(user?.balance || 0) < priceXu && (
+							<Text style={{ color: '#D32F2F', fontSize: 13, textAlign: 'center' }}>Không đủ xu. Vui lòng nạp thêm.</Text>
+						)}
+						<TouchableOpacity
+							style={{ backgroundColor: '#C0392B', borderRadius: 999, paddingVertical: 13, alignItems: 'center', opacity: (purchaseLoading || !user || (user?.balance || 0) < priceXu) ? 0.5 : 1 }}
+							onPress={handlePurchaseStory}
+							disabled={purchaseLoading || !user || (user?.balance || 0) < priceXu}
+						>
+							{purchaseLoading
+								? <ActivityIndicator color="#fff" size="small" />
+								: <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Xác nhận mua — {priceXu} xu</Text>
+							}
+						</TouchableOpacity>
+					</View>
+				</View>
+			)}
 		</SafeAreaView>
 	);
 };

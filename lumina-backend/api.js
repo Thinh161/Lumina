@@ -46,6 +46,18 @@ con.connect(function (err) {
     con.query(`ALTER TABLE users ADD COLUMN vip_expires_at DATETIME NULL`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('vip_expires_at col:', e.message);
     });
+    // Thêm cột price_xu vào stories nếu chưa có
+    con.query(`ALTER TABLE stories ADD COLUMN price_xu INT DEFAULT 0`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('price_xu col:', e.message);
+    });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS purchased_stories (
+            user_id INT NOT NULL,
+            story_id INT NOT NULL,
+            purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, story_id)
+        )
+    `, (e) => { if (e) console.log('purchased_stories table:', e.message); });
     // Thêm cột rejection_reason vào stories nếu chưa có
     con.query(`ALTER TABLE stories ADD COLUMN rejection_reason TEXT NULL`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('rejection_reason col:', e.message);
@@ -228,11 +240,57 @@ app.get('/api/stories/search', (req, res) => {
     });
 });
 
-// 4.4. Tăng lượt xem (kể cả guest)
+// 4.5. Trạng thái mua truyện của user
+app.get('/api/stories/:id/purchase-status', (req, res) => {
+    const { id } = req.params;
+    const { user_id } = req.query;
+    con.query(`SELECT price_xu FROM stories WHERE id = ?`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error" });
+        const price_xu = rows[0].price_xu || 0;
+        if (!user_id || price_xu === 0) return res.json({ status: "success", price_xu, has_purchased: false });
+        con.query(`SELECT 1 FROM purchased_stories WHERE user_id = ? AND story_id = ?`, [user_id, id], (err2, bought) => {
+            res.json({ status: "success", price_xu, has_purchased: !!(bought && bought.length > 0) });
+        });
+    });
+});
+
+// 4.6. Mua truyện trả phí
+app.post('/api/stories/:id/purchase', (req, res) => {
+    const { id } = req.params;
+    const { user_id } = req.body;
+    con.query(`SELECT price_xu, author_id, title FROM stories WHERE id = ?`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy truyện" });
+        const story = rows[0];
+        if (!story.price_xu) return res.json({ status: "error", message: "Truyện này miễn phí." });
+        con.query(`SELECT 1 FROM purchased_stories WHERE user_id = ? AND story_id = ?`, [user_id, id], (err2, existing) => {
+            if (existing && existing.length > 0) return res.json({ status: "error", message: "Bạn đã mua truyện này rồi." });
+            con.query(`SELECT balance FROM users WHERE id = ?`, [user_id], (err3, users) => {
+                if (err3 || !users[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user" });
+                if (users[0].balance < story.price_xu) return res.json({ status: "error", message: `Không đủ xu. Cần ${story.price_xu} xu.` });
+                con.query(`UPDATE users SET balance = balance - ? WHERE id = ?`, [story.price_xu, user_id], (err4) => {
+                    if (err4) return res.status(500).json({ status: "error", message: err4.message });
+                    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [story.price_xu, story.author_id], () => {});
+                    con.query(`INSERT INTO purchased_stories (user_id, story_id) VALUES (?, ?)`, [user_id, id], (err5) => {
+                        if (err5) return res.status(500).json({ status: "error", message: err5.message });
+                        res.json({ status: "success", message: `Đã mua "${story.title}" thành công!` });
+                    });
+                });
+            });
+        });
+    });
+});
+
+// 4.4. Tăng lượt xem + doanh thu tác giả (1 xu / 10 lượt xem)
 app.put('/api/stories/:id/view', (req, res) => {
     const { id } = req.params;
     con.query(`UPDATE stories SET views = views + 1 WHERE id = ?`, [id], (err) => {
         if (err) return res.status(500).json({ status: "error" });
+        // Credit tác giả 1 xu mỗi 10 lượt xem
+        con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [id], (err2, rows) => {
+            if (!err2 && rows[0] && rows[0].views % 10 === 0) {
+                con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [rows[0].author_id], () => {});
+            }
+        });
         res.json({ status: "success" });
     });
 });
@@ -268,30 +326,51 @@ app.get('/api/stories/:storyId/chapters', (req, res) => {
     });
 });
 
-// 7. Lấy nội dung chi tiết của một chương (unlock_at enforcement)
+// 7. Lấy nội dung chi tiết của một chương
 app.get('/api/chapters/:id', (req, res) => {
     const { id } = req.params;
     const { user_id } = req.query;
-    con.query(`SELECT * FROM chapters WHERE id = ?`, [id], (err, results) => {
+    con.query(
+        `SELECT c.*, s.author_id, s.price_xu, s.id as story_id FROM chapters c JOIN stories s ON c.story_id = s.id WHERE c.id = ?`,
+        [id], (err, results) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
-        if (results.length === 0) return res.status(404).json({ status: "error", message: "Không tìm thấy chương" });
+        if (!results[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy chương" });
         const chapter = results[0];
-        const isLocked = chapter.unlock_at && new Date(chapter.unlock_at) > new Date();
-        if (!isLocked) return res.json({ status: "success", data: chapter });
-        // Chương chưa đến ngày mở khóa
-        const unlockDate = new Date(chapter.unlock_at).toLocaleString('vi-VN', {
-            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
-        const lockedMsg = `Chương này sẽ mở khóa vào ${unlockDate}. Thành viên VIP có thể đọc ngay.`;
-        if (!user_id) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
+        const isTimeLocked = chapter.unlock_at && new Date(chapter.unlock_at) > new Date();
+        const isPaid = chapter.price_xu > 0;
+
+        // Không cần check gì thêm
+        if (!isPaid && !isTimeLocked) return res.json({ status: "success", data: chapter });
+
+        // Chưa đăng nhập
+        if (!user_id) {
+            if (isPaid) return res.status(403).json({ status: "error", code: "PURCHASE_REQUIRED", message: "Truyện này có phí. Vui lòng mua để đọc.", price_xu: chapter.price_xu, story_id: chapter.story_id });
+            const d = new Date(chapter.unlock_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: `Chương mở khóa ${d}. VIP đọc ngay.`, unlock_at: chapter.unlock_at });
+        }
+
         con.query(`SELECT is_vip, vip_expires_at, role_id FROM users WHERE id = ?`, [user_id], (err2, users) => {
-            if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
+            if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "PURCHASE_REQUIRED", message: "Vui lòng đăng nhập lại." });
             const u = users[0];
             const vipActive = u.is_vip && (!u.vip_expires_at || new Date(u.vip_expires_at) > new Date());
-            // VIP còn hạn, Admin (role_id=1), Author (role_id=2) được đọc trước ngày mở khóa
-            if (!vipActive && u.role_id !== 1 && u.role_id !== 2)
-                return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
-            res.json({ status: "success", data: chapter });
+            const isPrivileged = vipActive || u.role_id === 1 || u.role_id === 2 || chapter.author_id === parseInt(user_id);
+
+            // VIP / admin / chính tác giả: đọc tất cả
+            if (isPrivileged) return res.json({ status: "success", data: chapter });
+
+            if (isPaid) {
+                // Kiểm tra đã mua chưa
+                con.query(`SELECT 1 FROM purchased_stories WHERE user_id = ? AND story_id = ?`, [user_id, chapter.story_id], (err3, rows) => {
+                    if (err3 || !rows[0]) return res.status(403).json({ status: "error", code: "PURCHASE_REQUIRED", message: "Truyện này có phí. Vui lòng mua để đọc.", price_xu: chapter.price_xu, story_id: chapter.story_id });
+                    // Đã mua → đọc tất cả kể cả chương time-locked
+                    return res.json({ status: "success", data: chapter });
+                });
+                return;
+            }
+
+            // Truyện free nhưng chương time-locked
+            const d = new Date(chapter.unlock_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: `Chương mở khóa ${d}. VIP đọc ngay.`, unlock_at: chapter.unlock_at });
         });
     });
 });
@@ -473,10 +552,10 @@ app.get('/api/author/stories/:userId', (req, res) => {
 
 // 20. Đăng truyện mới
 app.post('/api/stories', (req, res) => {
-    const { title, description, thumbnail, author_id, category_ids } = req.body;
+    const { title, description, thumbnail, author_id, category_ids, price_xu } = req.body;
     con.query(
-        `INSERT INTO stories (title, description, thumbnail, author_id, status) VALUES (?, ?, ?, ?, 'pending')`,
-        [title, description, thumbnail, author_id],
+        `INSERT INTO stories (title, description, thumbnail, author_id, price_xu, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
+        [title, description, thumbnail, author_id, price_xu || 0],
         (err, result) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const storyId = result.insertId;
@@ -532,10 +611,10 @@ app.put('/api/chapters/:id', (req, res) => {
 // 20.1. Sửa thông tin truyện (tác giả)
 app.put('/api/stories/:id', (req, res) => {
     const { id } = req.params;
-    const { title, description, thumbnail, category_ids } = req.body;
+    const { title, description, thumbnail, category_ids, price_xu } = req.body;
     con.query(
-        `UPDATE stories SET title = ?, description = ?, thumbnail = ?, updated_at = NOW() WHERE id = ?`,
-        [title, description, thumbnail, id],
+        `UPDATE stories SET title = ?, description = ?, thumbnail = ?, price_xu = ?, updated_at = NOW() WHERE id = ?`,
+        [title, description, thumbnail, price_xu ?? 0, id],
         (err) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
             const ids = Array.isArray(category_ids) ? category_ids : [];
