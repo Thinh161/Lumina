@@ -293,6 +293,23 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				/* Tab Thu Nhập */
 				statsLoading || !authorStats ? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 				: <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+					{/* Chính sách doanh thu */}
+					<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFF8E1', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFE082' }}>
+						<MaterialIcons name="info-outline" size={18} color="#E65100" style={{ marginTop: 1 }} />
+						<View style={{ flex: 1, gap: 4 }}>
+							<Text style={{ fontSize: 13, fontWeight: '700', color: '#E65100' }}>Chính sách doanh thu</Text>
+							<Text style={{ fontSize: 12, color: '#5D4037', lineHeight: 18 }}>
+								{'• Mua truyện: bạn nhận '}
+								<Text style={{ fontWeight: '700' }}>70%</Text>
+								{', nền tảng giữ '}
+								<Text style={{ fontWeight: '700' }}>30%</Text>
+								{'\n• Lượt xem: cứ 100 lượt bạn nhận '}
+								<Text style={{ fontWeight: '700' }}>7 xu</Text>
+								{', nền tảng nhận 3 xu\n• Phần giữ lại dùng để duy trì và phát triển app'}
+							</Text>
+						</View>
+					</View>
+
 					{/* Tổng quan */}
 					<View style={{ flexDirection: 'row', gap: 10 }}>
 						{[
@@ -413,6 +430,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 										{parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100 && (
 											<Text style={{ color: '#D32F2F', fontSize: 11, marginTop: 2 }}>Tối thiểu 100 xu</Text>
 										)}
+										<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#FFF8E1', borderRadius: 8, padding: 10, marginTop: 8 }}>
+											<MaterialIcons name="info-outline" size={14} color="#E65100" style={{ marginTop: 1 }} />
+											<Text style={{ fontSize: 11, color: '#E65100', flex: 1, lineHeight: 16 }}>
+												Nền tảng giữ lại <Text style={{ fontWeight: '700' }}>30%</Text> doanh thu để duy trì app. Bạn nhận <Text style={{ fontWeight: '700' }}>70%</Text> trên mỗi lượt mua.
+												{parseInt(stPriceXu) >= 100 ? `\nVí dụ: ${stPriceXu} xu → bạn nhận ${Math.floor(parseInt(stPriceXu) * 0.7)} xu.` : ''}
+											</Text>
+										</View>
 									</>
 								)}
 							</View>
