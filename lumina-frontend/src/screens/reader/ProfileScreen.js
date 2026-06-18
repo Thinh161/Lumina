@@ -13,17 +13,7 @@ const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ88
 import { API_URL } from '../../config/api';
 import { confirmAlert } from '../../utils/confirmAlert';
 
-const BANK_INFO = {
-	bank: 'Vietcombank',
-	account: '1234 5678 9012',
-	owner: 'NGUYEN VAN ADMIN',
-};
-
-const VIP_PACKAGES = [
-	{ label: "1 tháng", vnd: 50000, months: 1 },
-	{ label: "3 tháng", vnd: 100000, months: 3 },
-	{ label: "Vĩnh viễn", vnd: 200000, months: null },
-];
+const VIP_XU_PRICE = 1000;
 
 const TOPUP_PACKAGES = [
 	{ label: "10.000đ", vnd: 10000, xu: 10 },
@@ -48,8 +38,6 @@ const ProfileScreen = ({ navigation }) => {
 	const [topupLoading, setTopupLoading] = useState(false);
 	const [unreadCount, setUnreadCount] = useState(0);
 	const [showVip, setShowVip] = useState(false);
-	const [selectedVipPkg, setSelectedVipPkg] = useState(null);
-	const [vipStep, setVipStep] = useState(1);
 	const [vipLoading, setVipLoading] = useState(false);
 
 	const [showWithdraw, setShowWithdraw] = useState(false);
@@ -120,29 +108,28 @@ const ProfileScreen = ({ navigation }) => {
 		finally { setTopupLoading(false); }
 	};
 
-	const handleVipRequest = async () => {
-		if (!selectedVipPkg) return;
+	const handleBuyVip = () => {
+		if (user?.is_vip) { Alert.alert("VIP", "Bạn đã là thành viên VIP rồi."); return; }
+		setShowVip(true);
+	};
+
+	const handleConfirmBuyVip = async () => {
+		if ((user?.balance || 0) < VIP_XU_PRICE) {
+			Alert.alert("Không đủ xu", `Bạn cần ít nhất ${VIP_XU_PRICE} xu để mua VIP.`);
+			return;
+		}
 		setVipLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/vip/request`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ user_id: user.id, amount_vnd: selectedVipPkg.vnd, months: selectedVipPkg.months }),
-			}).then(r => r.json());
+			const res = await fetch(`${API_URL}/users/${user.id}/buy-vip`, { method: 'PUT' }).then(r => r.json());
 			if (res.status === 'success') {
-				setVipStep(3);
+				dispatch(fetchUserProfile(user.id));
+				setShowVip(false);
+				Alert.alert("Thành công", "Bạn đã kích hoạt VIP!");
 			} else {
-				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
+				Alert.alert("Lỗi", res.message || "Không thể mua VIP.");
 			}
 		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
 		finally { setVipLoading(false); }
-	};
-
-	const handleBuyVip = () => {
-		if (user?.is_vip) { Alert.alert("VIP", "Bạn đã là thành viên VIP rồi."); return; }
-		setSelectedVipPkg(null);
-		setVipStep(1);
-		setShowVip(true);
 	};
 
 	const handleWithdraw = async () => {
@@ -324,93 +311,50 @@ const ProfileScreen = ({ navigation }) => {
 			</View>
 
 			{/* Modal Mua VIP */}
-			<Modal visible={showVip} animationType="slide" transparent>
+			<Modal visible={showVip} animationType="fade" transparent>
 				<View style={styles.overlay}>
-					<View style={styles.sheet}>
+					<View style={[styles.sheet, { gap: 16 }]}>
 						<View style={styles.sheetHeader}>
-							<Text style={styles.sheetTitle}>
-								{vipStep === 1 ? 'Chọn gói VIP' : vipStep === 2 ? 'Thông tin chuyển khoản' : 'Đang chờ xác nhận'}
-							</Text>
-							{vipStep !== 3 && (
-								<TouchableOpacity onPress={() => { setShowVip(false); setVipStep(1); setSelectedVipPkg(null); }}>
-									<MaterialIcons name="close" size={22} color="#888888" />
-								</TouchableOpacity>
-							)}
+							<Text style={styles.sheetTitle}>Mua VIP</Text>
+							<TouchableOpacity onPress={() => setShowVip(false)}>
+								<MaterialIcons name="close" size={22} color="#888888" />
+							</TouchableOpacity>
 						</View>
-						{vipStep === 1 ? (
-							<>
-								<Text style={styles.sheetSub}>Chuyển khoản ngân hàng — Admin duyệt và cấp VIP</Text>
-								<View style={{ gap: 8 }}>
-									{VIP_PACKAGES.map(p => (
-										<TouchableOpacity
-											key={p.label}
-											style={[styles.packageBtn, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-												selectedVipPkg?.label === p.label && styles.packageBtnActive]}
-											onPress={() => setSelectedVipPkg(p)}
-										>
-											<View>
-												<Text style={[styles.packageBtnText, selectedVipPkg?.label === p.label && styles.packageBtnTextActive]}>{p.label}</Text>
-												<Text style={[styles.packageBtnXu, selectedVipPkg?.label === p.label && { color: '#FFFFFF' }]}>
-													{p.months ? `${p.months} tháng VIP` : 'VIP vĩnh viễn'}
-												</Text>
-											</View>
-											<Text style={[{ fontSize: 16, fontWeight: '800' }, selectedVipPkg?.label === p.label ? { color: '#FFFFFF' } : { color: '#8B4513' }]}>
-												{p.vnd.toLocaleString('vi-VN')}đ
-											</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-								<TouchableOpacity
-									style={[styles.topupSubmitBtn, !selectedVipPkg && { opacity: 0.4 }]}
-									onPress={() => selectedVipPkg && setVipStep(2)} disabled={!selectedVipPkg}
-								>
-									<Text style={styles.topupSubmitText}>Tiếp theo</Text>
-									<MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
-								</TouchableOpacity>
-							</>
-						) : vipStep === 2 ? (
-							<>
-								<View style={styles.bankCard}>
-									{[
-										{ label: 'Ngân hàng', value: BANK_INFO.bank },
-										{ label: 'Số tài khoản', value: BANK_INFO.account, bold: true },
-										{ label: 'Chủ tài khoản', value: BANK_INFO.owner },
-										{ label: 'Số tiền', value: `${selectedVipPkg?.vnd.toLocaleString('vi-VN')}đ`, accent: true },
-									].map(r => (
-										<View key={r.label} style={styles.bankRow}>
-											<Text style={styles.bankLabel}>{r.label}</Text>
-											<Text style={[styles.bankValue, r.bold && { fontSize: 16 }, r.accent && { color: '#8B4513' }]}>{r.value}</Text>
-										</View>
-									))}
-								</View>
-								<View style={styles.transferNoteBox}>
-									<Text style={styles.transferNoteLabel}>Nội dung chuyển khoản:</Text>
-									<Text style={styles.transferNoteValue}>LUMINA VIP {user?.username?.toUpperCase()} {selectedVipPkg?.vnd}</Text>
-								</View>
-								<Text style={styles.transferHint}>Sau khi chuyển khoản, ấn xác nhận. Admin sẽ kiểm tra và cấp VIP cho bạn.</Text>
-								<TouchableOpacity
-									style={[styles.topupSubmitBtn, vipLoading && { opacity: 0.6 }]}
-									onPress={handleVipRequest} disabled={vipLoading}
-								>
-									{vipLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.topupSubmitText}>Đã chuyển khoản — Xác nhận</Text>}
-								</TouchableOpacity>
-								<TouchableOpacity style={styles.backStepBtn} onPress={() => setVipStep(1)}>
-									<Text style={styles.backStepText}>Chọn lại gói khác</Text>
-								</TouchableOpacity>
-							</>
-						) : (
-							<View style={styles.waitingBox}>
-								<ActivityIndicator size="large" color="#8B4513" />
-								<Text style={styles.waitingTitle}>Yêu cầu đã được gửi!</Text>
-								<Text style={styles.waitingDesc}>
-									Admin sẽ kiểm tra và cấp <Text style={{ fontWeight: '800', color: '#8B4513' }}>{selectedVipPkg?.label} VIP</Text> cho bạn.
-								</Text>
-								<TouchableOpacity style={[styles.topupSubmitBtn, { marginTop: 8 }]}
-									onPress={() => { setShowVip(false); setVipStep(1); setSelectedVipPkg(null); }}>
-									<Text style={styles.topupSubmitText}>Đóng</Text>
-								</TouchableOpacity>
+						<View style={{ alignItems: 'center', paddingVertical: 8, gap: 6 }}>
+							<MaterialIcons name="star" size={48} color="#FFD700" />
+							<Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1A1A' }}>Thành viên VIP</Text>
+							<Text style={{ fontSize: 13, color: '#888888', textAlign: 'center' }}>Đọc trước các chương VIP, không giới hạn nội dung</Text>
+						</View>
+						<View style={{ backgroundColor: '#F5F0EB', borderRadius: 12, padding: 14, gap: 8 }}>
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+								<Text style={{ fontSize: 14, color: '#666666' }}>Giá</Text>
+								<Text style={{ fontSize: 14, fontWeight: '700', color: '#8B4513' }}>{VIP_XU_PRICE} xu</Text>
 							</View>
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+								<Text style={{ fontSize: 14, color: '#666666' }}>Số dư hiện tại</Text>
+								<Text style={{ fontSize: 14, fontWeight: '700', color: (user?.balance || 0) >= VIP_XU_PRICE ? '#2E7D32' : '#D32F2F' }}>
+									{Math.floor(user?.balance || 0)} xu
+								</Text>
+							</View>
+						</View>
+						{(user?.balance || 0) < VIP_XU_PRICE && (
+							<Text style={{ fontSize: 13, color: '#D32F2F', textAlign: 'center' }}>
+								Không đủ xu. Vui lòng nạp thêm để mua VIP.
+							</Text>
 						)}
+						<TouchableOpacity
+							style={[styles.topupSubmitBtn, (vipLoading || (user?.balance || 0) < VIP_XU_PRICE) && { opacity: 0.4 }]}
+							onPress={handleConfirmBuyVip}
+							disabled={vipLoading || (user?.balance || 0) < VIP_XU_PRICE}
+						>
+							{vipLoading
+								? <ActivityIndicator color="#fff" size="small" />
+								: <Text style={styles.topupSubmitText}>Xác nhận mua — {VIP_XU_PRICE} xu</Text>
+							}
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.backStepBtn} onPress={() => setShowVip(false)}>
+							<Text style={styles.backStepText}>Hủy</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 			</Modal>
