@@ -238,7 +238,7 @@ const ProfileScreen = ({ navigation }) => {
 									<Text style={styles.vipButtonText}>Nạp Xu</Text>
 									<MaterialIcons name="add" size={16} color="#FFFFFF" />
 								</TouchableOpacity>
-								{!user?.is_vip && !isAuthor && (
+								{!user?.is_vip && (
 									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#5D2E0C" }]} onPress={handleBuyVip}>
 										<Text style={styles.vipButtonText}>Mua VIP</Text>
 										<MaterialIcons name="star" size={16} color="#FFD700" />
