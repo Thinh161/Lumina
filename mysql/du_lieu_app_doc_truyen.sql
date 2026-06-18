@@ -75,6 +75,7 @@ CREATE TABLE chapters (
     chapter_number INT NOT NULL,
     title VARCHAR(255),
     content LONGTEXT NOT NULL,
+    views INT DEFAULT 0,
     unlock_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (story_id) REFERENCES stories(id)

@@ -95,6 +95,9 @@ con.connect(function (err) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('withdraw_requests table:', e.message); });
+    con.query(`ALTER TABLE chapters ADD COLUMN views INT DEFAULT 0`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('chapters.views col:', e.message);
+    });
     con.query(`
         CREATE TABLE IF NOT EXISTS story_categories (
             story_id INT NOT NULL,
@@ -240,6 +243,27 @@ app.get('/api/stories/search', (req, res) => {
     });
 });
 
+// 4.4b. Tăng lượt xem chương (chỉ gọi khi đọc ≥80%) — cộng vào story.views + doanh thu tác giả
+app.put('/api/chapters/:id/view', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT story_id FROM chapters WHERE id = ?`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error" });
+        const storyId = rows[0].story_id;
+        con.query(`UPDATE chapters SET views = views + 1 WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error" });
+            // Cập nhật story.views = tổng views của các chương
+            con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(views),0) FROM chapters WHERE story_id = ?) WHERE id = ?`, [storyId, storyId], () => {});
+            // Doanh thu tác giả: 1 xu mỗi 10 lượt xem chapter
+            con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
+                if (!err3 && sRows[0] && sRows[0].views % 10 === 0 && sRows[0].views > 0) {
+                    con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [sRows[0].author_id], () => {});
+                }
+            });
+            res.json({ status: "success" });
+        });
+    });
+});
+
 // 4.5. Trạng thái mua truyện của user
 app.get('/api/stories/:id/purchase-status', (req, res) => {
     const { id } = req.params;
@@ -280,20 +304,7 @@ app.post('/api/stories/:id/purchase', (req, res) => {
     });
 });
 
-// 4.4. Tăng lượt xem + doanh thu tác giả (1 xu / 10 lượt xem)
-app.put('/api/stories/:id/view', (req, res) => {
-    const { id } = req.params;
-    con.query(`UPDATE stories SET views = views + 1 WHERE id = ?`, [id], (err) => {
-        if (err) return res.status(500).json({ status: "error" });
-        // Credit tác giả 1 xu mỗi 10 lượt xem
-        con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [id], (err2, rows) => {
-            if (!err2 && rows[0] && rows[0].views % 10 === 0) {
-                con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [rows[0].author_id], () => {});
-            }
-        });
-        res.json({ status: "success" });
-    });
-});
+// 4.4. (deprecated - view tính từ chapters, không dùng nữa)
 
 // 5. Chi tiết một truyện
 app.get('/api/stories/:id', (req, res) => {

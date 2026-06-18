@@ -70,7 +70,6 @@ const StoryDetailScreen = ({ navigation, route }) => {
 			dispatch(fetchChapters(storyId));
 			loadComments();
 			loadBookmark();
-			fetch(`${API_URL}/stories/${storyId}/view`, { method: 'PUT' }).catch(() => {});
 			// Lấy trạng thái mua truyện
 			const uid = user?.id ? `?user_id=${user.id}` : '';
 			fetch(`${API_URL}/stories/${storyId}/purchase-status${uid}`)
