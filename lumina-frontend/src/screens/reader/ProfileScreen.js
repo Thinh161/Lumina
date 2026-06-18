@@ -193,11 +193,7 @@ const ProfileScreen = ({ navigation }) => {
 		<SafeAreaView style={styles.safeArea}>
 			<View style={styles.root}>
 				<View style={styles.topBar}>
-					<View style={styles.topBarLeft}>
-						<MaterialIcons name="menu" size={22} color="#1A1A1A" />
-						<Text style={styles.topBarTitle}>App Đọc Truyện Online</Text>
-					</View>
-					<MaterialIcons name="search" size={22} color="#1A1A1A" />
+					<Text style={styles.topBarTitle}>App Đọc Truyện Online</Text>
 				</View>
 
 				<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -588,8 +584,7 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
 	root: { flex: 1, position: "relative" },
-	topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
-	topBarLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+	topBar: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	topBarTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A1A" },
 	scrollContent: { padding: 16, paddingBottom: 140 },
 	profileHeader: { gap: 16, marginBottom: 24 },
