@@ -18,13 +18,19 @@ var con = mysql.createConnection({
 con.connect(function (err) {
     if (err) throw err;
     console.log("Connected to AppDocTruyen Database!!!");
+    // Dọn bảng không dùng
+    con.query(`DROP TABLE IF EXISTS purchased_chapters`, (e) => { if (e) console.log('drop purchased_chapters:', e.message); });
+    con.query(`DROP TABLE IF EXISTS transactions`, (e) => { if (e) console.log('drop transactions:', e.message); });
+    con.query(`ALTER TABLE chapters DROP COLUMN IF EXISTS is_vip`, (e) => {
+        if (e && !e.message.includes("check that column/key exists")) console.log('drop is_vip col:', e.message);
+    });
     con.query(`
         CREATE TABLE IF NOT EXISTS notifications (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
             type VARCHAR(50) NOT NULL,
             message TEXT NOT NULL,
-            is_read TINYINT(1) DEFAULT 0,
+            is_read TINYINT DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('notifications table:', e.message); });
@@ -33,7 +39,7 @@ con.connect(function (err) {
         if (e && !e.message.includes('Duplicate column')) console.log('unlock_at col:', e.message);
     });
     // Thêm cột author_request vào users nếu chưa có
-    con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT(1) DEFAULT 0`, (e) => {
+    con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT DEFAULT 0`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('author_request col:', e.message);
     });
     // Thêm cột rejection_reason vào stories nếu chưa có
@@ -50,6 +56,29 @@ con.connect(function (err) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('topup_requests table:', e.message); });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS vip_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            amount_vnd INT NOT NULL,
+            months INT NULL,
+            status ENUM('pending','approved','rejected') DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `, (e) => { if (e) console.log('vip_requests table:', e.message); });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS withdraw_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            amount_xu INT NOT NULL,
+            amount_vnd INT NOT NULL,
+            bank_name VARCHAR(100) DEFAULT '',
+            bank_account VARCHAR(100) NOT NULL,
+            bank_owner VARCHAR(100) DEFAULT '',
+            status ENUM('pending','approved','rejected') DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `, (e) => { if (e) console.log('withdraw_requests table:', e.message); });
 });
 
 // ================= API ENDPOINTS =================
@@ -475,11 +504,11 @@ app.put('/api/stories/:id', (req, res) => {
 
 // ========== LỊCH SỬ ĐỌC ==========
 
-// 27. Lịch sử đọc của user (từ bookmarks)
+// 27. Lịch sử đọc của user — deduplicate by story (latest chapter per story)
 app.get('/api/history/:userId', (req, res) => {
     const { userId } = req.params;
     const sql = `
-        SELECT b.id, b.chapter_id, b.scroll_position, b.updated_at,
+        SELECT b.chapter_id, b.scroll_position, b.updated_at,
                c.chapter_number, c.title as chapter_title, c.story_id,
                s.title as story_title, s.thumbnail as cover_image, s.author_id,
                u.full_name as author_name
@@ -488,6 +517,11 @@ app.get('/api/history/:userId', (req, res) => {
         JOIN stories s ON c.story_id = s.id
         LEFT JOIN users u ON s.author_id = u.id
         WHERE b.user_id = ?
+          AND b.updated_at = (
+              SELECT MAX(b2.updated_at) FROM bookmarks b2
+              JOIN chapters c2 ON b2.chapter_id = c2.id
+              WHERE b2.user_id = b.user_id AND c2.story_id = c.story_id
+          )
         ORDER BY b.updated_at DESC
         LIMIT 20
     `;
@@ -797,6 +831,137 @@ app.put('/api/notifications/read/:userId', (req, res) => {
     con.query(`UPDATE notifications SET is_read = 1 WHERE user_id = ?`, [userId], (err) => {
         if (err) return res.status(500).json({ status: "error", message: err.message });
         res.json({ status: "success" });
+    });
+});
+
+// ========== VIP REQUEST ==========
+
+app.post('/api/vip/request', (req, res) => {
+    const { user_id, amount_vnd, months } = req.body;
+    if (!user_id || !amount_vnd) return res.status(400).json({ status: "error", message: "Thiếu thông tin." });
+    con.query(
+        `INSERT INTO vip_requests (user_id, amount_vnd, months) VALUES (?, ?, ?)`,
+        [user_id, amount_vnd, months || null],
+        (err, result) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success", id: result.insertId });
+        }
+    );
+});
+
+app.get('/api/admin/vip-requests', (req, res) => {
+    const status = req.query.status || 'pending';
+    con.query(
+        `SELECT v.*, u.username, u.full_name, u.avatar FROM vip_requests v
+         JOIN users u ON v.user_id = u.id WHERE v.status = ? ORDER BY v.created_at DESC`,
+        [status],
+        (err, results) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success", data: results });
+        }
+    );
+});
+
+app.put('/api/admin/vip/:id/approve', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT * FROM vip_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        const r = rows[0];
+        con.query(`UPDATE vip_requests SET status = 'approved' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            con.query(`UPDATE users SET is_vip = 1 WHERE id = ?`, [r.user_id], (err3) => {
+                if (err3) return res.status(500).json({ status: "error", message: err3.message });
+                con.query(
+                    `INSERT INTO notifications (user_id, type, message) VALUES (?, 'vip_approved', 'Yêu cầu VIP của bạn đã được xác nhận! Chúc mừng bạn trở thành thành viên VIP.')`,
+                    [r.user_id], () => {}
+                );
+                res.json({ status: "success" });
+            });
+        });
+    });
+});
+
+app.put('/api/admin/vip/:id/reject', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT user_id FROM vip_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        con.query(`UPDATE vip_requests SET status = 'rejected' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            con.query(
+                `INSERT INTO notifications (user_id, type, message) VALUES (?, 'vip_rejected', 'Yêu cầu VIP của bạn đã bị từ chối. Vui lòng liên hệ Admin.')`,
+                [rows[0].user_id], () => {}
+            );
+            res.json({ status: "success" });
+        });
+    });
+});
+
+// ========== WITHDRAW (TÁC GIẢ RÚT TIỀN) ==========
+
+app.post('/api/withdraw/request', (req, res) => {
+    const { user_id, amount_xu, bank_name, bank_account, bank_owner } = req.body;
+    if (!user_id || !amount_xu || !bank_account) return res.status(400).json({ status: "error", message: "Thiếu thông tin." });
+    if (amount_xu < 10) return res.json({ status: "error", message: "Cần ít nhất 10 xu để rút." });
+    con.query(`SELECT balance FROM users WHERE id = ?`, [user_id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user." });
+        if (rows[0].balance < amount_xu) return res.json({ status: "error", message: "Số xu không đủ." });
+        const amount_vnd = amount_xu * 1000;
+        con.query(
+            `INSERT INTO withdraw_requests (user_id, amount_xu, amount_vnd, bank_name, bank_account, bank_owner) VALUES (?, ?, ?, ?, ?, ?)`,
+            [user_id, amount_xu, amount_vnd, bank_name || '', bank_account, bank_owner || ''],
+            (err2, result) => {
+                if (err2) return res.status(500).json({ status: "error", message: err2.message });
+                con.query(`UPDATE users SET balance = balance - ? WHERE id = ?`, [amount_xu, user_id], () => {});
+                res.json({ status: "success", id: result.insertId, amount_vnd });
+            }
+        );
+    });
+});
+
+app.get('/api/admin/withdrawals', (req, res) => {
+    const status = req.query.status || 'pending';
+    con.query(
+        `SELECT w.*, u.username, u.full_name, u.avatar FROM withdraw_requests w
+         JOIN users u ON w.user_id = u.id WHERE w.status = ? ORDER BY w.created_at DESC`,
+        [status],
+        (err, results) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            res.json({ status: "success", data: results });
+        }
+    );
+});
+
+app.put('/api/admin/withdraw/:id/approve', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT * FROM withdraw_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        con.query(`UPDATE withdraw_requests SET status = 'approved' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            con.query(
+                `INSERT INTO notifications (user_id, type, message) VALUES (?, 'withdraw_approved', ?)`,
+                [rows[0].user_id, `Yêu cầu rút ${rows[0].amount_xu} xu (${rows[0].amount_vnd.toLocaleString()}đ) đã được chuyển khoản thành công.`],
+                () => {}
+            );
+            res.json({ status: "success" });
+        });
+    });
+});
+
+app.put('/api/admin/withdraw/:id/reject', (req, res) => {
+    const { id } = req.params;
+    con.query(`SELECT * FROM withdraw_requests WHERE id = ? AND status = 'pending'`, [id], (err, rows) => {
+        if (err || !rows[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy yêu cầu." });
+        con.query(`UPDATE withdraw_requests SET status = 'rejected' WHERE id = ?`, [id], (err2) => {
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            // Hoàn xu lại
+            con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [rows[0].amount_xu, rows[0].user_id], () => {});
+            con.query(
+                `INSERT INTO notifications (user_id, type, message) VALUES (?, 'withdraw_rejected', ?)`,
+                [rows[0].user_id, `Yêu cầu rút ${rows[0].amount_xu} xu đã bị từ chối. Xu đã được hoàn lại.`],
+                () => {}
+            );
+            res.json({ status: "success" });
+        });
     });
 });
 

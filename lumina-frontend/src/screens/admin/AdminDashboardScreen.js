@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput, RefreshControl
+	SafeAreaView, Alert, ActivityIndicator, Image, Modal, TextInput, RefreshControl, ScrollView
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -13,18 +13,27 @@ const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 const AdminDashboardScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
 	const [tab, setTab] = useState('stories');
-	const [storyFilter, setStoryFilter] = useState('pending'); // pending | published | rejected
+	const [storyFilter, setStoryFilter] = useState('pending');
 	const [pendingStories, setPendingStories] = useState([]);
 	const [filteredStories, setFilteredStories] = useState([]);
 	const [users, setUsers] = useState([]);
 	const [authorRequests, setAuthorRequests] = useState([]);
 	const [topupRequests, setTopupRequests] = useState([]);
 	const [topupFilter, setTopupFilter] = useState('pending');
+	const [vipRequests, setVipRequests] = useState([]);
+	const [vipFilter, setVipFilter] = useState('pending');
+	const [withdrawRequests, setWithdrawRequests] = useState([]);
+	const [withdrawFilter, setWithdrawFilter] = useState('pending');
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [rejectTarget, setRejectTarget] = useState(null);
 	const [rejectReason, setRejectReason] = useState('');
 	const [rejecting, setRejecting] = useState(false);
+	const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', onOk: null, destructive: false });
+
+	const confirm = (title, msg, onOk, destructive = false) => {
+		setConfirmModal({ visible: true, title, message: msg, onOk, destructive });
+	};
 
 	const loadData = useCallback(async () => {
 		setLoading(true);
@@ -43,23 +52,33 @@ const AdminDashboardScreen = ({ navigation }) => {
 			} else if (tab === 'topup') {
 				const res = await fetch(`${API_URL}/admin/topup?status=${topupFilter}`).then(r => r.json());
 				setTopupRequests(res.data || []);
+			} else if (tab === 'vip') {
+				const res = await fetch(`${API_URL}/admin/vip-requests?status=${vipFilter}`).then(r => r.json());
+				setVipRequests(res.data || []);
+			} else if (tab === 'withdraw') {
+				const res = await fetch(`${API_URL}/admin/withdrawals?status=${withdrawFilter}`).then(r => r.json());
+				setWithdrawRequests(res.data || []);
 			} else {
 				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
 				setUsers((res.data || []).filter(u => u.role_id !== 1));
 			}
 		} finally { setLoading(false); setRefreshing(false); }
-	}, [tab, storyFilter, topupFilter]);
+	}, [tab, storyFilter, topupFilter, vipFilter, withdrawFilter]);
 
 	useEffect(() => { loadData(); }, [loadData]);
 
 	const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 
-	// Load counts for badges on every mount
+	// Load badge counts
 	useEffect(() => {
 		fetch(`${API_URL}/admin/author-requests`).then(r => r.json())
 			.then(res => setAuthorRequests(res.data || [])).catch(() => {});
 		fetch(`${API_URL}/admin/topup`).then(r => r.json())
 			.then(res => setTopupRequests(res.data || [])).catch(() => {});
+		fetch(`${API_URL}/admin/vip-requests`).then(r => r.json())
+			.then(res => setVipRequests(res.data || [])).catch(() => {});
+		fetch(`${API_URL}/admin/withdrawals`).then(r => r.json())
+			.then(res => setWithdrawRequests(res.data || [])).catch(() => {});
 	}, []);
 
 	const apiCall = async (url, options = {}) => {
@@ -69,19 +88,11 @@ const AdminDashboardScreen = ({ navigation }) => {
 		return json;
 	};
 
-	const confirm = (title, msg, onOk, destructive = false) => {
-		Alert.alert(title, msg, [
-			{ text: "Hủy", style: "cancel" },
-			{ text: "Xác nhận", style: destructive ? "destructive" : "default", onPress: onOk },
-		]);
-	};
-
 	const handleApprove = (storyId) => confirm(
 		"Duyệt truyện", "Xác nhận duyệt và phát hành truyện này?",
 		async () => {
 			try {
 				await apiCall(`${API_URL}/admin/stories/${storyId}/status`, { method: 'PUT', body: JSON.stringify({ status: 'published' }) });
-				Alert.alert("Thành công", "Đã duyệt truyện.");
 				loadData();
 			} catch (e) { Alert.alert("Lỗi", e.message); }
 		}
@@ -120,7 +131,6 @@ const AdminDashboardScreen = ({ navigation }) => {
 		async () => {
 			try {
 				await apiCall(`${API_URL}/admin/users/${userId}/vip`, { method: 'PUT' });
-				Alert.alert("Thành công", `Đã cấp VIP cho @${username}.`);
 				loadData();
 			} catch (e) { Alert.alert("Lỗi", e.message); }
 		}
@@ -141,7 +151,6 @@ const AdminDashboardScreen = ({ navigation }) => {
 		async () => {
 			try {
 				await apiCall(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
-				Alert.alert("Thành công", `Đã cấp quyền Author cho ${name}.`);
 				loadData();
 			} catch (e) { Alert.alert("Lỗi", e.message); }
 		}
@@ -162,7 +171,6 @@ const AdminDashboardScreen = ({ navigation }) => {
 		async () => {
 			try {
 				await apiCall(`${API_URL}/admin/topup/${id}/approve`, { method: 'PUT' });
-				Alert.alert("Thành công", "Đã duyệt và cộng xu.");
 				loadData();
 			} catch (e) { Alert.alert("Lỗi", e.message); }
 		}
@@ -173,6 +181,46 @@ const AdminDashboardScreen = ({ navigation }) => {
 		async () => {
 			try {
 				await apiCall(`${API_URL}/admin/topup/${id}/reject`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}, true
+	);
+
+	const handleApproveVip = (id) => confirm(
+		"Xác nhận VIP", "Bạn đã nhận được thanh toán và muốn cấp VIP cho người dùng này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/vip/${id}/approve`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
+
+	const handleRejectVip = (id) => confirm(
+		"Từ chối VIP", "Từ chối yêu cầu mua VIP này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/vip/${id}/reject`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}, true
+	);
+
+	const handleApproveWithdraw = (id) => confirm(
+		"Xác nhận rút tiền", "Bạn đã chuyển khoản thành công cho tác giả này?",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/withdraw/${id}/approve`, { method: 'PUT' });
+				loadData();
+			} catch (e) { Alert.alert("Lỗi", e.message); }
+		}
+	);
+
+	const handleRejectWithdraw = (id) => confirm(
+		"Từ chối rút tiền", "Từ chối yêu cầu rút tiền? Xu sẽ được hoàn lại.",
+		async () => {
+			try {
+				await apiCall(`${API_URL}/admin/withdraw/${id}/reject`, { method: 'PUT' });
 				loadData();
 			} catch (e) { Alert.alert("Lỗi", e.message); }
 		}, true
@@ -281,31 +329,129 @@ const AdminDashboardScreen = ({ navigation }) => {
 					</View>
 				</View>
 				{item.status === 'pending' ? (
-				<View style={s.actions}>
-					<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveTopup(item.id)}>
-						<MaterialIcons name="check" size={16} color="#FFFFFF" />
-						<Text style={s.approveBtnText}>Xác nhận</Text>
-					</TouchableOpacity>
-					<TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => handleRejectTopup(item.id)}>
-						<MaterialIcons name="close" size={16} color="#FFFFFF" />
-						<Text style={s.rejectBtnText}>Từ chối</Text>
-					</TouchableOpacity>
-				</View>
-			) : (
-				<View style={[s.statusDot, { alignSelf: 'flex-start', backgroundColor: item.status === 'approved' ? '#2E7D32' : '#D32F2F', paddingHorizontal: 10, paddingVertical: 4 }]}>
-					<Text style={s.statusDotText}>{item.status === 'approved' ? '✓ Đã duyệt' : '✗ Từ chối'}</Text>
-				</View>
-			)}
+					<View style={s.actions}>
+						<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveTopup(item.id)}>
+							<MaterialIcons name="check" size={16} color="#FFFFFF" />
+							<Text style={s.approveBtnText}>Xác nhận</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => handleRejectTopup(item.id)}>
+							<MaterialIcons name="close" size={16} color="#FFFFFF" />
+							<Text style={s.rejectBtnText}>Từ chối</Text>
+						</TouchableOpacity>
+					</View>
+				) : (
+					<View style={[s.statusDot, { alignSelf: 'flex-start', backgroundColor: item.status === 'approved' ? '#2E7D32' : '#D32F2F', paddingHorizontal: 10, paddingVertical: 4 }]}>
+						<Text style={s.statusDotText}>{item.status === 'approved' ? '✓ Đã duyệt' : '✗ Từ chối'}</Text>
+					</View>
+				)}
 			</View>
 		);
 	};
 
+	const renderVipRequest = ({ item }) => {
+		const date = new Date(item.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+		return (
+			<View style={s.card}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+					<Image source={{ uri: item.avatar || DEFAULT_COVER }} style={[s.avatar, { borderRadius: 8 }]} />
+					<View style={{ flex: 1 }}>
+						<Text style={s.cardTitle}>{item.full_name || item.username}</Text>
+						<Text style={s.cardMeta}>@{item.username} • {date}</Text>
+						<Text style={s.cardMeta}>{item.months ? `${item.months} tháng VIP` : 'VIP vĩnh viễn'}</Text>
+					</View>
+					<View style={{ alignItems: 'flex-end' }}>
+						<Text style={{ fontSize: 16, fontWeight: '800', color: '#8B4513' }}>{Number(item.amount_vnd).toLocaleString('vi-VN')}đ</Text>
+						<View style={[s.statusDot, { backgroundColor: '#8B4513', marginTop: 4 }]}>
+							<Text style={s.statusDotText}>VIP</Text>
+						</View>
+					</View>
+				</View>
+				{item.status === 'pending' ? (
+					<View style={s.actions}>
+						<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveVip(item.id)}>
+							<MaterialIcons name="star" size={16} color="#FFFFFF" />
+							<Text style={s.approveBtnText}>Cấp VIP</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => handleRejectVip(item.id)}>
+							<MaterialIcons name="close" size={16} color="#FFFFFF" />
+							<Text style={s.rejectBtnText}>Từ chối</Text>
+						</TouchableOpacity>
+					</View>
+				) : (
+					<View style={[s.statusDot, { alignSelf: 'flex-start', backgroundColor: item.status === 'approved' ? '#2E7D32' : '#D32F2F', paddingHorizontal: 10, paddingVertical: 4 }]}>
+						<Text style={s.statusDotText}>{item.status === 'approved' ? '✓ Đã cấp VIP' : '✗ Từ chối'}</Text>
+					</View>
+				)}
+			</View>
+		);
+	};
+
+	const renderWithdrawRequest = ({ item }) => {
+		const date = new Date(item.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+		return (
+			<View style={s.card}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+					<Image source={{ uri: item.avatar || DEFAULT_COVER }} style={[s.avatar, { borderRadius: 8 }]} />
+					<View style={{ flex: 1 }}>
+						<Text style={s.cardTitle}>{item.full_name || item.username}</Text>
+						<Text style={s.cardMeta}>@{item.username} • {date}</Text>
+					</View>
+					<View style={{ alignItems: 'flex-end' }}>
+						<Text style={{ fontSize: 15, fontWeight: '800', color: '#2E7D32' }}>{item.amount_xu} xu</Text>
+						<Text style={{ fontSize: 12, color: '#888888' }}>{Number(item.amount_vnd).toLocaleString('vi-VN')}đ</Text>
+					</View>
+				</View>
+				<View style={{ backgroundColor: '#F5F5F5', borderRadius: 8, padding: 10, marginBottom: 8, gap: 4 }}>
+					{item.bank_name ? <Text style={s.cardMeta}>Ngân hàng: <Text style={{ fontWeight: '700', color: '#1A1A1A' }}>{item.bank_name}</Text></Text> : null}
+					<Text style={s.cardMeta}>STK: <Text style={{ fontWeight: '700', color: '#1A1A1A' }}>{item.bank_account}</Text></Text>
+					{item.bank_owner ? <Text style={s.cardMeta}>Chủ TK: <Text style={{ fontWeight: '700', color: '#1A1A1A' }}>{item.bank_owner}</Text></Text> : null}
+				</View>
+				{item.status === 'pending' ? (
+					<View style={s.actions}>
+						<TouchableOpacity style={[s.approveBtn, { flex: 1 }]} onPress={() => handleApproveWithdraw(item.id)}>
+							<MaterialIcons name="account-balance" size={16} color="#FFFFFF" />
+							<Text style={s.approveBtnText}>Đã chuyển khoản</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => handleRejectWithdraw(item.id)}>
+							<MaterialIcons name="close" size={16} color="#FFFFFF" />
+							<Text style={s.rejectBtnText}>Từ chối</Text>
+						</TouchableOpacity>
+					</View>
+				) : (
+					<View style={[s.statusDot, { alignSelf: 'flex-start', backgroundColor: item.status === 'approved' ? '#2E7D32' : '#D32F2F', paddingHorizontal: 10, paddingVertical: 4 }]}>
+						<Text style={s.statusDotText}>{item.status === 'approved' ? '✓ Đã chuyển khoản' : '✗ Từ chối'}</Text>
+					</View>
+				)}
+			</View>
+		);
+	};
+
+	const pendingVipCount = vipRequests.filter(r => r.status === 'pending').length;
+	const pendingWithdrawCount = withdrawRequests.filter(r => r.status === 'pending').length;
+
 	const TABS = [
 		{ key: 'stories', label: 'Truyện' },
 		{ key: 'authors', label: `Tác giả${authorRequests.length > 0 ? ` (${authorRequests.length})` : ''}` },
-		{ key: 'users', label: 'Người dùng' },
-		{ key: 'topup', label: `Nạp xu${topupRequests.length > 0 ? ` (${topupRequests.length})` : ''}` },
+		{ key: 'users', label: 'Users' },
+		{ key: 'topup', label: `Nạp xu${topupRequests.filter(r => r.status === 'pending').length > 0 ? ` (${topupRequests.filter(r => r.status === 'pending').length})` : ''}` },
+		{ key: 'vip', label: `VIP${pendingVipCount > 0 ? ` (${pendingVipCount})` : ''}` },
+		{ key: 'withdraw', label: `Rút${pendingWithdrawCount > 0 ? ` (${pendingWithdrawCount})` : ''}` },
 	];
+
+	const filterOptions = {
+		stories: ['pending', 'published', 'rejected'],
+		topup: ['pending', 'approved', 'rejected'],
+		vip: ['pending', 'approved', 'rejected'],
+		withdraw: ['pending', 'approved', 'rejected'],
+	};
+	const filterLabels = { pending: 'Chờ duyệt', published: 'Đã duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' };
+	const currentFilter = tab === 'stories' ? storyFilter : tab === 'topup' ? topupFilter : tab === 'vip' ? vipFilter : withdrawFilter;
+	const setFilter = (f) => {
+		if (tab === 'stories') setStoryFilter(f);
+		else if (tab === 'topup') setTopupFilter(f);
+		else if (tab === 'vip') setVipFilter(f);
+		else if (tab === 'withdraw') setWithdrawFilter(f);
+	};
 
 	return (
 		<SafeAreaView style={s.safe}>
@@ -313,44 +459,28 @@ const AdminDashboardScreen = ({ navigation }) => {
 				<Text style={s.headerTitle}>Admin Dashboard</Text>
 				<TouchableOpacity
 					style={s.logoutBtn}
-					onPress={() => Alert.alert("Đăng xuất", "Bạn muốn đăng xuất?", [
-						{ text: "Hủy", style: "cancel" },
-						{ text: "Đăng xuất", style: "destructive", onPress: () => { dispatch(logout()); navigation.replace("Guest"); } }
-					])}
+					onPress={() => confirm("Đăng xuất", "Bạn muốn đăng xuất?", () => { dispatch(logout()); navigation.replace("Guest"); }, true)}
 				>
 					<MaterialIcons name="logout" size={20} color="#D32F2F" />
 				</TouchableOpacity>
 			</View>
 
-			<View style={s.tabRow}>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 52 }} contentContainerStyle={s.tabRow}>
 				{TABS.map(t => (
 					<TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
 						<Text style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</Text>
 					</TouchableOpacity>
 				))}
-			</View>
+			</ScrollView>
 
-			{tab === 'stories' && (
+			{filterOptions[tab] && (
 				<View style={s.filterRow}>
-					{['pending', 'published', 'rejected'].map(f => (
-						<TouchableOpacity key={f} style={[s.filterBtn, storyFilter === f && s.filterBtnActive]} onPress={() => setStoryFilter(f)}>
-							<Text style={[s.filterText, storyFilter === f && s.filterTextActive]}>
-								{f === 'pending' ? 'Chờ duyệt' : f === 'published' ? 'Đã duyệt' : 'Từ chối'}
-								{f === 'pending' && pendingStories.length > 0 ? ` (${pendingStories.length})` : ''}
+					{filterOptions[tab].map(f => (
+						<TouchableOpacity key={f} style={[s.filterBtn, currentFilter === f && s.filterBtnActive]} onPress={() => setFilter(f)}>
+							<Text style={[s.filterText, currentFilter === f && s.filterTextActive]}>
+								{filterLabels[f] || f}
+								{f === 'pending' && tab === 'stories' && pendingStories.length > 0 ? ` (${pendingStories.length})` : ''}
 							</Text>
-						</TouchableOpacity>
-					))}
-				</View>
-			)}
-			{tab === 'topup' && (
-				<View style={s.filterRow}>
-					{[
-						{ key: 'pending', label: 'Chờ duyệt' },
-						{ key: 'approved', label: 'Đã duyệt' },
-						{ key: 'rejected', label: 'Từ chối' },
-					].map(f => (
-						<TouchableOpacity key={f.key} style={[s.filterBtn, topupFilter === f.key && s.filterBtnActive]} onPress={() => setTopupFilter(f.key)}>
-							<Text style={[s.filterText, topupFilter === f.key && s.filterTextActive]}>{f.label}</Text>
 						</TouchableOpacity>
 					))}
 				</View>
@@ -358,31 +488,31 @@ const AdminDashboardScreen = ({ navigation }) => {
 
 			{loading ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
-			) : tab === 'stories' && displayedStories.length === 0 ? (
-				<View style={s.center}>
-					<MaterialIcons name="check-circle" size={52} color="#2E7D32" />
-					<Text style={s.emptyText}>Không có truyện nào.</Text>
-				</View>
 			) : tab === 'stories' ? (
-				<FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
-			) : tab === 'authors' && authorRequests.length === 0 ? (
-				<View style={s.center}>
-					<MaterialIcons name="person-add-disabled" size={52} color="#EBEBEB" />
-					<Text style={s.emptyText}>Không có yêu cầu tác giả nào.</Text>
-				</View>
+				displayedStories.length === 0
+					? <View style={s.center}><MaterialIcons name="check-circle" size={52} color="#2E7D32" /><Text style={s.emptyText}>Không có truyện nào.</Text></View>
+					: <FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'authors' ? (
-				<FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
-			) : tab === 'topup' && topupRequests.length === 0 ? (
-				<View style={s.center}>
-					<MaterialIcons name="account-balance-wallet" size={52} color="#EBEBEB" />
-					<Text style={s.emptyText}>Không có yêu cầu nạp xu nào.</Text>
-				</View>
+				authorRequests.length === 0
+					? <View style={s.center}><MaterialIcons name="person-add-disabled" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu tác giả nào.</Text></View>
+					: <FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'topup' ? (
-				<FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+				topupRequests.length === 0
+					? <View style={s.center}><MaterialIcons name="account-balance-wallet" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu nạp xu nào.</Text></View>
+					: <FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+			) : tab === 'vip' ? (
+				vipRequests.length === 0
+					? <View style={s.center}><MaterialIcons name="star-outline" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu VIP nào.</Text></View>
+					: <FlatList data={vipRequests} keyExtractor={i => String(i.id)} renderItem={renderVipRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+			) : tab === 'withdraw' ? (
+				withdrawRequests.length === 0
+					? <View style={s.center}><MaterialIcons name="account-balance" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu rút tiền nào.</Text></View>
+					: <FlatList data={withdrawRequests} keyExtractor={i => String(i.id)} renderItem={renderWithdrawRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : (
 				<FlatList data={users} keyExtractor={i => String(i.id)} renderItem={renderUser} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			)}
 
+			{/* Reject Story Modal */}
 			<Modal visible={!!rejectTarget} animationType="slide" transparent>
 				<View style={s.overlay}>
 					<View style={s.sheet}>
@@ -395,11 +525,33 @@ const AdminDashboardScreen = ({ navigation }) => {
 							style={[s.input, { height: 100, textAlignVertical: "top" }]}
 							value={rejectReason} onChangeText={setRejectReason}
 							placeholder="Ví dụ: Nội dung vi phạm quy định..." placeholderTextColor="#BBBBBB"
-							multiline autoFocus
+							multiline
 						/>
 						<TouchableOpacity style={[s.rejectSubmitBtn, rejecting && { opacity: 0.6 }]} onPress={handleRejectSubmit} disabled={rejecting}>
 							{rejecting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.rejectSubmitText}>Xác nhận từ chối</Text>}
 						</TouchableOpacity>
+					</View>
+				</View>
+			</Modal>
+
+			{/* ConfirmModal */}
+			<Modal visible={confirmModal.visible} animationType="fade" transparent>
+				<View style={s.overlay}>
+					<View style={[s.sheet, { paddingBottom: 28 }]}>
+						<Text style={[s.sheetTitle, { marginBottom: 8 }]}>{confirmModal.title}</Text>
+						<Text style={{ fontSize: 14, color: "#888888", marginBottom: 20 }}>{confirmModal.message}</Text>
+						<View style={{ flexDirection: 'row', gap: 10 }}>
+							<TouchableOpacity
+								style={{ flex: 1, paddingVertical: 12, borderRadius: 999, backgroundColor: '#F5F5F5', alignItems: 'center' }}
+								onPress={() => setConfirmModal(m => ({ ...m, visible: false }))}>
+								<Text style={{ fontWeight: '700', color: '#888888' }}>Hủy</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={{ flex: 1, paddingVertical: 12, borderRadius: 999, backgroundColor: confirmModal.destructive ? '#D32F2F' : '#2E7D32', alignItems: 'center' }}
+								onPress={() => { setConfirmModal(m => ({ ...m, visible: false })); confirmModal.onOk?.(); }}>
+								<Text style={{ fontWeight: '700', color: '#FFFFFF' }}>Xác nhận</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 				</View>
 			</Modal>
@@ -412,8 +564,8 @@ const s = StyleSheet.create({
 	header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
 	headerTitle: { fontSize: 22, fontWeight: "800", color: "#1A1A1A" },
 	logoutBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFF0F0", alignItems: "center", justifyContent: "center" },
-	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginVertical: 10 },
-	tabBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
+	tabRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, paddingVertical: 10 },
+	tabBtn: { paddingVertical: 9, paddingHorizontal: 14, alignItems: "center", borderRadius: 10, backgroundColor: "#F5F5F5", borderWidth: 1, borderColor: "#EBEBEB" },
 	tabBtnActive: { backgroundColor: "#8B4513", borderColor: "#8B4513" },
 	tabText: { fontSize: 12, fontWeight: "700", color: "#888888" },
 	tabTextActive: { color: "#FFFFFF" },

@@ -18,6 +18,7 @@ import { fetchStoryDetails, fetchChapters, clearCurrentStory } from "../../redux
 import { addToLibrary, removeFromLibrary, fetchLibrary } from "../../redux_thunk/LibrarySlice";
 
 import { API_URL } from '../../config/api';
+import { confirmAlert } from '../../utils/confirmAlert';
 const DEFAULT_STORY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBvQzYRtYjISxgN15SaT96ZzRp0uhBsLi8dtlvBxtguAe6xQdLmGTT2DPmYgyXdBP9vHMV4o_Y-0WGc0cf6j7bsZDbN4nbabvlvhk20QmITP7ODv5EnXRTGOfvT6ng5cYr2q7IczdQCFVBcnqUent2OjsU41hp7ym-gHYBYq3eBKXIb7MKUQvkoAZctRNEzkIKwQl2okLEZv0nlLr7XzWyP7sNX8e_kGu814cdSoyr5V2dMljfbJGiav9so7PC7k4udoHlX6nakoD8";
 
 const StoryDetailScreen = ({ navigation, route }) => {
@@ -28,7 +29,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 	const { items: libraryItems } = useSelector(state => state.library);
 	const [libraryLoading, setLibraryLoading] = useState(false);
 
-	const isInLibrary = libraryItems.some(item => item.id === storyId);
+	const isInLibrary = !!user && user.role_id !== 1 && libraryItems.some(item => item.id === storyId);
 
 	const [comments, setComments] = useState([]);
 	const [commentText, setCommentText] = useState('');
@@ -84,18 +85,12 @@ const StoryDetailScreen = ({ navigation, route }) => {
 	};
 
 	const handleDeleteComment = (commentId) => {
-		Alert.alert("Xóa bình luận", "Bạn muốn xóa bình luận này?", [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Xóa", style: "destructive",
-				onPress: async () => {
-					try {
-						await fetch(`${API_URL}/comments/${commentId}/${user.id}`, { method: 'DELETE' });
-						setComments(prev => prev.filter(c => c.id !== commentId));
-					} catch {}
-				}
-			}
-		]);
+		confirmAlert("Xóa bình luận", "Bạn muốn xóa bình luận này?", async () => {
+			try {
+				await fetch(`${API_URL}/comments/${commentId}/${user.id}`, { method: 'DELETE' });
+				setComments(prev => prev.filter(c => c.id !== commentId));
+			} catch {}
+		}, true);
 	};
 
 	const handleEditComment = (comment) => {
@@ -155,7 +150,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 					</TouchableOpacity>
 				</View>
 
-				<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+				<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 					<View style={styles.hero}>
 						<View style={styles.coverWrap}>
 							<View style={styles.coverShadow} />
@@ -207,7 +202,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 								<Text style={styles.actionPrimaryText}>Đọc Ngay</Text>
 							</TouchableOpacity>
 						)}
-						<TouchableOpacity
+						{user?.role_id !== 1 && <TouchableOpacity
 							style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
 							disabled={libraryLoading}
 							onPress={async () => {
@@ -227,7 +222,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8B4513" }]}>
 								{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
 							</Text>
-						</TouchableOpacity>
+						</TouchableOpacity>}
 					</View>
 
 					<View style={styles.contentRow}>

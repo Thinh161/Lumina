@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
-	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Image
+	SafeAreaView, Alert, ActivityIndicator, Modal, TextInput, ScrollView, Image, Platform
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
+import { confirmAlert } from "../../utils/confirmAlert";
 
 import { API_URL } from '../../config/api';
 const STATUS_COLOR = { published: "#2E7D32", pending: "#E65100", rejected: "#D32F2F" };
 const STATUS_LABEL = { published: "Đã duyệt", pending: "Chờ duyệt", rejected: "Bị từ chối" };
 
-const AuthorDashboardScreen = ({ navigation }) => {
+const AuthorDashboardScreen = ({ navigation, route }) => {
 	const { user } = useSelector(s => s.auth);
 	const [stories, setStories] = useState([]);
 	const [categories, setCategories] = useState([]);
@@ -38,6 +40,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	const [savingChap, setSavingChap] = useState(false);
 	const [chapContentLoading, setChapContentLoading] = useState(false);
 	const [unreadCount, setUnreadCount] = useState(0);
+	const fileInputRef = useRef(null);
 
 	const loadUnreadCount = useCallback(async () => {
 		if (!user) return;
@@ -60,6 +63,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	}, [user]);
 
 	useEffect(() => { loadData(); loadUnreadCount(); }, [loadData, loadUnreadCount]);
+	useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
 	const openNewStory = () => {
 		setEditingStory(null);
@@ -112,19 +116,13 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	};
 
 	const handleDeleteChapter = (chapter) => {
-		Alert.alert("Xóa chương", `Xóa "Chương ${chapter.chapter_number}: ${chapter.title}"?`, [
-			{ text: "Hủy", style: "cancel" },
-			{
-				text: "Xóa", style: "destructive",
-				onPress: async () => {
-					try {
-						await fetch(`${API_URL}/chapters/${chapter.id}`, { method: 'DELETE' });
-						setStoryChapters(prev => prev.filter(c => c.id !== chapter.id));
-						loadData();
-					} catch { Alert.alert("Lỗi", "Không thể xóa chương."); }
-				}
-			}
-		]);
+		confirmAlert("Xóa chương", `Xóa "Chương ${chapter.chapter_number}: ${chapter.title}"?`, async () => {
+			try {
+				await fetch(`${API_URL}/chapters/${chapter.id}`, { method: 'DELETE' });
+				setStoryChapters(prev => prev.filter(c => c.id !== chapter.id));
+				loadData();
+			} catch { Alert.alert("Lỗi", "Không thể xóa chương."); }
+		}, true);
 	};
 
 	const parseDateInput = (str) => {
@@ -151,6 +149,15 @@ const AuthorDashboardScreen = ({ navigation }) => {
 			const res = await fetch(`${API_URL}/chapters/${chapter.id}?user_id=${user.id}`).then(r => r.json());
 			if (res.status === 'success') setChapContent(res.data.content || '');
 		} catch {} finally { setChapContentLoading(false); }
+	};
+
+	const handleFileChange = (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = (evt) => setChapContent(evt.target.result);
+		reader.readAsText(file, 'UTF-8');
+		e.target.value = '';
 	};
 
 	const handleSaveChapter = async () => {
@@ -180,7 +187,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 		<View style={s.card}>
 			<View style={s.rowBetween}>
 				<Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
-				<View style={[s.badge, { backgroundColor: STATUS_COLOR[item.status] + '22' }]}>
+				<View style={[s.statusBadge, { backgroundColor: STATUS_COLOR[item.status] + '22' }]}>
 					<Text style={[s.badgeText, { color: STATUS_COLOR[item.status] }]}>{STATUS_LABEL[item.status]}</Text>
 				</View>
 			</View>
@@ -211,9 +218,16 @@ const AuthorDashboardScreen = ({ navigation }) => {
 	return (
 		<SafeAreaView style={s.safe}>
 			<View style={s.header}>
-				<View>
-					<Text style={s.headerTitle}>Quản lý truyện</Text>
-					<Text style={s.headerSub}>Xin chào, {user?.full_name || user?.username}</Text>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+					{navigation.canGoBack() && (
+						<TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+							<MaterialIcons name="arrow-back" size={22} color="#8B4513" />
+						</TouchableOpacity>
+					)}
+					<View>
+						<Text style={s.headerTitle}>Quản lý truyện</Text>
+						<Text style={s.headerSub}>Xin chào, {user?.full_name || user?.username}</Text>
+					</View>
 				</View>
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
 					<TouchableOpacity style={s.bellBtn} onPress={() => { setUnreadCount(0); navigation.navigate("Notifications"); }}>
@@ -249,7 +263,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 							<Text style={s.sheetTitle}>{editingStory ? "Sửa thông tin truyện" : "Đăng truyện mới"}</Text>
 							<TouchableOpacity onPress={() => setShowStoryModal(false)}><MaterialIcons name="close" size={22} color="#888888" /></TouchableOpacity>
 						</View>
-						<ScrollView showsVerticalScrollIndicator={false}>
+						<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 							{[
 								{ label: "Tên truyện *", val: stTitle, set: setStTitle, ph: "Tên truyện..." },
 								{ label: "URL ảnh bìa", val: stThumb, set: setStThumb, ph: "https://..." },
@@ -303,7 +317,7 @@ const AuthorDashboardScreen = ({ navigation }) => {
 								<Text style={{ color: "#888888", fontSize: 14 }}>Chưa có chương nào.</Text>
 							</View>
 						) : (
-							<ScrollView showsVerticalScrollIndicator={false}>
+							<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 								{storyChapters.map(chap => (
 									<View key={chap.id} style={s.chapRow}>
 										<View style={{ flex: 1 }}>
@@ -336,6 +350,10 @@ const AuthorDashboardScreen = ({ navigation }) => {
 				</View>
 			</Modal>
 
+			{Platform.OS === 'web' && (
+				<input type="file" accept=".txt" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+			)}
+
 			{/* Modal sửa chương */}
 			<Modal visible={!!editingChapter} animationType="slide" transparent>
 				<View style={s.overlay}>
@@ -344,13 +362,24 @@ const AuthorDashboardScreen = ({ navigation }) => {
 							<Text style={s.sheetTitle}>Sửa chương {editingChapter?.chapter_number}</Text>
 							<TouchableOpacity onPress={() => setEditingChapter(null)}><MaterialIcons name="close" size={22} color="#888888" /></TouchableOpacity>
 						</View>
-						<ScrollView showsVerticalScrollIndicator={false}>
+						<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 							<View style={s.field}>
 								<Text style={s.fieldLabel}>Tiêu đề *</Text>
 								<TextInput style={s.input} value={chapTitle} onChangeText={setChapTitle} placeholder="Tên chương..." placeholderTextColor="#BBBBBB" />
 							</View>
 							<View style={s.field}>
-								<Text style={s.fieldLabel}>Nội dung *</Text>
+								<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+									<Text style={s.fieldLabel}>Nội dung *</Text>
+									{Platform.OS === 'web' && (
+										<TouchableOpacity
+											style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F5F0EB', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#E8D5C4' }}
+											onPress={() => fileInputRef.current?.click()}
+										>
+											<MaterialIcons name="upload-file" size={15} color="#8B4513" />
+											<Text style={{ fontSize: 12, fontWeight: '600', color: '#8B4513' }}>Upload .txt</Text>
+										</TouchableOpacity>
+									)}
+								</View>
 								{chapContentLoading ? (
 									<View style={{ paddingVertical: 20, alignItems: "center" }}>
 										<ActivityIndicator color="#8B4513" />
@@ -398,7 +427,7 @@ const s = StyleSheet.create({
 	card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: "#F0F0F0" },
 	rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
 	cardTitle: { fontSize: 15, fontWeight: "700", color: "#1A1A1A", flex: 1 },
-	badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+	statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 	badgeText: { fontSize: 10, fontWeight: "700" },
 	cardMeta: { fontSize: 12, color: "#888888", marginBottom: 8 },
 	rejectionBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF0F0", borderRadius: 8, padding: 8, marginBottom: 8 },

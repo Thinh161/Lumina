@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
 	View, Text, TextInput, TouchableOpacity, StyleSheet,
-	SafeAreaView, ScrollView, Alert, ActivityIndicator
+	SafeAreaView, ScrollView, Alert, ActivityIndicator, Platform
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -9,10 +9,8 @@ import { API_URL } from '../../config/api';
 
 const parseDateInput = (str) => {
 	if (!str.trim()) return null;
-	// DD/MM/YYYY
 	const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
 	if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-	// YYYY-MM-DD
 	if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str;
 	return null;
 };
@@ -23,6 +21,27 @@ const AddChapterScreen = ({ navigation, route }) => {
 	const [content, setContent] = useState('');
 	const [unlockAt, setUnlockAt] = useState('');
 	const [saving, setSaving] = useState(false);
+	const fileInputRef = useRef(null);
+
+	const handlePickFile = () => {
+		if (Platform.OS === 'web') {
+			fileInputRef.current?.click();
+		}
+	};
+
+	const handleFileChange = (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = (evt) => {
+			setContent(evt.target.result);
+			if (!title.trim()) {
+				setTitle(file.name.replace(/\.txt$/i, ''));
+			}
+		};
+		reader.readAsText(file, 'UTF-8');
+		e.target.value = '';
+	};
 
 	const handleSave = async () => {
 		if (!title.trim() || !content.trim()) {
@@ -46,7 +65,8 @@ const AddChapterScreen = ({ navigation, route }) => {
 			}).then(r => r.json());
 
 			if (res.status === "success") {
-				Alert.alert("Thành công", `Đã thêm Chương ${res.chapter_number}.`, [{ text: "OK", onPress: () => navigation.goBack() }]);
+				Alert.alert("Thành công", `Đã thêm Chương ${res.chapter_number}.`);
+				navigation.goBack();
 			} else {
 				Alert.alert("Lỗi", res.message);
 			}
@@ -59,6 +79,16 @@ const AddChapterScreen = ({ navigation, route }) => {
 
 	return (
 		<SafeAreaView style={s.safe}>
+			{Platform.OS === 'web' && (
+				<input
+					type="file"
+					accept=".txt"
+					ref={fileInputRef}
+					style={{ display: 'none' }}
+					onChange={handleFileChange}
+				/>
+			)}
+
 			<View style={s.topBar}>
 				<TouchableOpacity onPress={() => navigation.goBack()}>
 					<MaterialIcons name="arrow-back" size={22} color="#8B4513" />
@@ -72,7 +102,7 @@ const AddChapterScreen = ({ navigation, route }) => {
 				</TouchableOpacity>
 			</View>
 
-			<ScrollView contentContainerStyle={s.content}>
+			<ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 				<View style={s.unlockRow}>
 					<MaterialIcons name="schedule" size={18} color="#8B4513" style={{ marginTop: 2 }} />
 					<View style={{ flex: 1 }}>
@@ -101,12 +131,20 @@ const AddChapterScreen = ({ navigation, route }) => {
 				</View>
 
 				<View style={s.field}>
-					<Text style={s.label}>Nội dung *</Text>
+					<View style={s.labelRow}>
+						<Text style={s.label}>Nội dung *</Text>
+						{Platform.OS === 'web' && (
+							<TouchableOpacity style={s.uploadBtn} onPress={handlePickFile}>
+								<MaterialIcons name="upload-file" size={15} color="#8B4513" />
+								<Text style={s.uploadBtnText}>Upload .txt</Text>
+							</TouchableOpacity>
+						)}
+					</View>
 					<TextInput
 						style={[s.input, s.contentInput]}
 						value={content}
 						onChangeText={setContent}
-						placeholder="Viết nội dung chương ở đây..."
+						placeholder="Viết nội dung chương hoặc upload file .txt..."
 						placeholderTextColor="#BBBBBB"
 						multiline
 						textAlignVertical="top"
@@ -130,7 +168,10 @@ const s = StyleSheet.create({
 	dateInput: { backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E8D5C4", paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: "#1A1A1A", marginTop: 6 },
 	unlockHint: { fontSize: 11, color: "#8B4513", marginTop: 4 },
 	field: { gap: 6 },
+	labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 	label: { fontSize: 13, fontWeight: "700", color: "#1A1A1A" },
+	uploadBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F5F0EB", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "#E8D5C4" },
+	uploadBtnText: { fontSize: 12, fontWeight: "600", color: "#8B4513" },
 	input: { backgroundColor: "#F5F5F5", borderRadius: 10, borderWidth: 1, borderColor: "#EBEBEB", paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: "#1A1A1A" },
 	contentInput: { height: 320, lineHeight: 22 },
 	charCount: { fontSize: 11, color: "#BBBBBB", textAlign: "right" },

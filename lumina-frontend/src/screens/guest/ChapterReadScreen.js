@@ -8,11 +8,14 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	Dimensions,
-	Alert
+	Alert,
+	Modal,
+	FlatList,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchChapterContent, clearChapterContent } from "../../redux_thunk/StorySlice";
+import { addToLibrary, removeFromLibrary, fetchLibrary } from "../../redux_thunk/LibrarySlice";
 import { API_URL } from '../../config/api';
 
 const FONT_SIZES = [14, 16, 18, 20];
@@ -27,6 +30,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	const dispatch = useDispatch();
 	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked, vipBlockedMessage } = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
+	const { items: libraryItems } = useSelector(state => state.library);
 	const scrollPositionRef = useRef(0);
 	const [progress, setProgress] = useState(0);
 	const contentHeightRef = useRef(0);
@@ -35,6 +39,23 @@ const ChapterReadScreen = ({ navigation, route }) => {
 	const [fontSize, setFontSize] = useState(16);
 	const [bgMode, setBgMode] = useState('light');
 	const theme = THEMES[bgMode];
+	const [showTOC, setShowTOC] = useState(false);
+	const [libraryLoading, setLibraryLoading] = useState(false);
+
+	const isInLibrary = !!user && user.role_id !== 1 && libraryItems.some(item => item.id === storyId);
+
+	const handleToggleLibrary = async () => {
+		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện."); return; }
+		setLibraryLoading(true);
+		try {
+			if (isInLibrary) {
+				await dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+			} else {
+				await dispatch(addToLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+				dispatch(fetchLibrary(user.id));
+			}
+		} finally { setLibraryLoading(false); }
+	};
 
 	const cycleFontSize = () => {
 		const idx = FONT_SIZES.indexOf(fontSize);
@@ -64,11 +85,8 @@ const ChapterReadScreen = ({ navigation, route }) => {
 
 	useEffect(() => {
 		if (vipBlocked) {
-			Alert.alert(
-				"Chương chưa mở khóa",
-				vipBlockedMessage || "Chương này chưa mở khóa. Thành viên VIP có thể đọc ngay.",
-				[{ text: "Quay lại", onPress: () => navigation.goBack() }]
-			);
+			Alert.alert("Chương chưa mở khóa", vipBlockedMessage || "Chương này chưa mở khóa. Thành viên VIP có thể đọc ngay.");
+			navigation.goBack();
 		}
 	}, [vipBlocked, navigation]);
 
@@ -188,15 +206,54 @@ const ChapterReadScreen = ({ navigation, route }) => {
 						<View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
 					</View>
 					<View style={styles.progressActions}>
-						<TouchableOpacity>
-							<MaterialIcons name="bookmark" size={20} color="#888888" />
+						<TouchableOpacity onPress={handleToggleLibrary} disabled={libraryLoading}>
+							<MaterialIcons
+								name={isInLibrary ? "bookmark" : "bookmark-border"}
+								size={20}
+								color={isInLibrary ? "#8B4513" : "#888888"}
+							/>
 						</TouchableOpacity>
-						<TouchableOpacity>
+						<TouchableOpacity onPress={() => setShowTOC(true)}>
 							<MaterialIcons name="list-alt" size={20} color="#888888" />
 						</TouchableOpacity>
 					</View>
 				</View>
 			</View>
+
+			<Modal visible={showTOC} animationType="slide" transparent>
+				<View style={styles.tocOverlay}>
+					<View style={styles.tocSheet}>
+						<View style={styles.tocHeader}>
+							<Text style={styles.tocTitle}>Mục lục</Text>
+							<TouchableOpacity onPress={() => setShowTOC(false)}>
+								<MaterialIcons name="close" size={22} color="#888888" />
+							</TouchableOpacity>
+						</View>
+						<FlatList
+							data={currentChapters}
+							keyExtractor={item => String(item.id)}
+							renderItem={({ item }) => {
+								const isActive = item.id === chapterId;
+								return (
+									<TouchableOpacity
+										style={[styles.tocItem, isActive && styles.tocItemActive]}
+										onPress={() => {
+											setShowTOC(false);
+											if (!isActive) navigation.push("ChapterRead", { chapterId: item.id, storyId });
+										}}
+									>
+										<Text style={[styles.tocItemText, isActive && { color: "#8B4513", fontWeight: "700" }]}>
+											Chương {item.chapter_number}: {item.title}
+										</Text>
+										{isActive && <MaterialIcons name="play-arrow" size={16} color="#8B4513" />}
+									</TouchableOpacity>
+								);
+							}}
+							showsVerticalScrollIndicator={false}
+						/>
+					</View>
+				</View>
+			</Modal>
 		</SafeAreaView>
 	);
 };
@@ -258,6 +315,13 @@ const styles = StyleSheet.create({
 	progressTrack: { flex: 1, height: 4, borderRadius: 999, backgroundColor: "#EBEBEB", overflow: "hidden" },
 	progressFill: { height: "100%", backgroundColor: "#8B4513" },
 	progressActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+	tocOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+	tocSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "70%" },
+	tocHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+	tocTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A1A" },
+	tocItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+	tocItemActive: { backgroundColor: "#F5F0EB", borderRadius: 8, paddingHorizontal: 8 },
+	tocItemText: { fontSize: 13, color: "#1A1A1A", flex: 1 },
 });
 
 export default ChapterReadScreen;

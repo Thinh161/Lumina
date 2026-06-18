@@ -40,7 +40,8 @@ const ChangePasswordScreen = ({ navigation }) => {
 			}).then(r => r.json());
 
 			if (res.status === "success") {
-				Alert.alert("Thành công", "Đã đổi mật khẩu.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+				Alert.alert("Thành công", "Đã đổi mật khẩu.");
+				navigation.goBack();
 			} else {
 				Alert.alert("Lỗi", res.message);
 			}

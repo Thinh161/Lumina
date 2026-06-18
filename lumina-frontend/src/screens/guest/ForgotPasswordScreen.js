@@ -33,9 +33,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
 				body: JSON.stringify({ username: username.trim(), email: email.trim().toLowerCase(), new_password: newPassword }),
 			}).then(r => r.json());
 			if (res.status === 'success') {
-				Alert.alert("Thành công", "Mật khẩu đã được đặt lại. Vui lòng đăng nhập lại.", [
-					{ text: "Đăng nhập", onPress: () => navigation.goBack() }
-				]);
+				Alert.alert("Thành công", "Mật khẩu đã được đặt lại. Vui lòng đăng nhập lại.");
+				navigation.goBack();
 			} else {
 				Alert.alert("Xác minh thất bại", res.message || "Tên đăng nhập hoặc email không đúng.");
 			}
