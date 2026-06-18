@@ -264,14 +264,12 @@ app.put('/api/chapters/:id/view', (req, res) => {
                 if (err2) return res.status(500).json({ status: "error" });
                 con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(v),0) FROM (SELECT views v FROM chapters WHERE story_id = ?) t) WHERE id = ?`, [storyId, storyId], () => {});
                 con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
-                    if (!err3 && sRows[0] && sRows[0].views > 0) {
-                        const v = sRows[0].views;
+                    if (!err3 && sRows[0] && sRows[0].views > 0 && sRows[0].views % 100 === 0) {
                         const authorId = sRows[0].author_id;
-                        // Tác giả: 70% ~ +1 xu mỗi 10 view
-                        if (v % 10 === 0) con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [authorId], () => {});
-                        // Admin: 30% ~ +1 xu mỗi 33 view (xấp xỉ 30%)
-                        if (v % 33 === 0) con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
-                            if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [admins[0].id], () => {});
+                        // Mỗi 100 view: tổng 10 xu → tác giả 7, admin 3
+                        con.query(`UPDATE users SET balance = balance + 7 WHERE id = ?`, [authorId], () => {});
+                        con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                            if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 3 WHERE id = ?`, [admins[0].id], () => {});
                         });
                     }
                 });
