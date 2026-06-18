@@ -70,7 +70,7 @@ const HomeScreen = ({ navigation }) => {
 		} catch { Alert.alert("Lỗi", "Không thể mở chương."); }
 	};
 
-	const filtered = selectedCat ? stories.filter(s => s.category_id === selectedCat) : stories;
+	const filtered = selectedCat ? stories.filter(s => s.category_ids?.split(',').map(Number).includes(selectedCat)) : stories;
 	const displayed = filtered.slice(0, displayCount);
 	const hasMore = displayCount < filtered.length;
 
@@ -129,7 +129,7 @@ const HomeScreen = ({ navigation }) => {
 					<TouchableOpacity style={s.featured} onPress={() => navigation.navigate("StoryDetail", { storyId: filtered[0].id })} activeOpacity={0.9}>
 						<Image source={{ uri: filtered[0].cover_image || DEFAULT_IMG }} style={s.featuredImg} />
 						<View style={s.featuredInfo}>
-							<View style={s.catTag}><Text style={s.catTagText}>{filtered[0].category_name}</Text></View>
+							<View style={s.catTag}><Text style={s.catTagText}>{filtered[0].category_names}</Text></View>
 							<Text style={s.featuredTitle} numberOfLines={2}>{filtered[0].title}</Text>
 							<Text style={s.featuredAuthor}>{filtered[0].author_name}</Text>
 							<TouchableOpacity style={s.readBtn} onPress={() => handleReadNow(filtered[0].id)}>
@@ -182,7 +182,7 @@ const HomeScreen = ({ navigation }) => {
 							<Text style={s.cardTitle} numberOfLines={2}>{story.title}</Text>
 							<Text style={s.cardAuthor} numberOfLines={1}>{story.author_name}</Text>
 							<View style={s.cardMeta}>
-								<View style={s.catPill}><Text style={s.catPillText}>{story.category_name}</Text></View>
+								<View style={s.catPill}><Text style={s.catPillText}>{story.category_names}</Text></View>
 								<Text style={s.views}><MaterialIcons name="visibility" size={11} color="#BBBBBB" /> {story.views || 0}</Text>
 							</View>
 							<Text style={s.cardDesc} numberOfLines={2}>{story.description}</Text>

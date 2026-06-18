@@ -79,6 +79,20 @@ con.connect(function (err) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `, (e) => { if (e) console.log('withdraw_requests table:', e.message); });
+    con.query(`
+        CREATE TABLE IF NOT EXISTS story_categories (
+            story_id INT NOT NULL,
+            category_id INT NOT NULL,
+            PRIMARY KEY (story_id, category_id)
+        )
+    `, (e) => {
+        if (e) { console.log('story_categories table:', e.message); return; }
+        // Migrate dữ liệu cũ từ stories.category_id sang story_categories
+        con.query(`
+            INSERT IGNORE INTO story_categories (story_id, category_id)
+            SELECT id, category_id FROM stories WHERE category_id IS NOT NULL
+        `, (e2) => { if (e2) console.log('migrate story_categories:', e2.message); });
+    });
 });
 
 // ================= API ENDPOINTS =================
@@ -143,10 +157,11 @@ app.get('/api/categories', (req, res) => {
 // 4. Lấy danh sách tất cả truyện (đã được duyệt)
 app.get('/api/stories', (req, res) => {
     const sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.status = 'published'
     `;
     con.query(sql, (err, results) => {
@@ -158,8 +173,10 @@ app.get('/api/stories', (req, res) => {
 // 4.2. Truyện mới nhất (phải đặt TRƯỚC /api/stories/:id)
 app.get('/api/stories/latest', (req, res) => {
     const sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
-        FROM stories s LEFT JOIN users u ON s.author_id = u.id LEFT JOIN categories c ON s.category_id = c.id
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids
+        FROM stories s LEFT JOIN users u ON s.author_id = u.id
         WHERE s.status = 'published' ORDER BY s.created_at DESC LIMIT 8
     `;
     con.query(sql, (err, results) => {
@@ -171,8 +188,10 @@ app.get('/api/stories/latest', (req, res) => {
 // 4.3. Truyện xem nhiều nhất (phải đặt TRƯỚC /api/stories/:id)
 app.get('/api/stories/top', (req, res) => {
     const sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
-        FROM stories s LEFT JOIN users u ON s.author_id = u.id LEFT JOIN categories c ON s.category_id = c.id
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids
+        FROM stories s LEFT JOIN users u ON s.author_id = u.id
         WHERE s.status = 'published' ORDER BY s.views DESC LIMIT 8
     `;
     con.query(sql, (err, results) => {
@@ -185,16 +204,17 @@ app.get('/api/stories/top', (req, res) => {
 app.get('/api/stories/search', (req, res) => {
     const { q = '', category_id, sort } = req.query;
     let sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.status = 'published'
         AND (s.title LIKE ? OR u.full_name LIKE ?)
     `;
     const params = [`%${q}%`, `%${q}%`];
     if (category_id) {
-        sql += ` AND s.category_id = ?`;
+        sql += ` AND EXISTS (SELECT 1 FROM story_categories sc WHERE sc.story_id = s.id AND sc.category_id = ?)`;
         params.push(category_id);
     }
     sql += sort === 'views' ? ' ORDER BY s.views DESC' : ' ORDER BY s.created_at DESC';
@@ -217,10 +237,11 @@ app.put('/api/stories/:id/view', (req, res) => {
 app.get('/api/stories/:id', (req, res) => {
     const { id } = req.params;
     const sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name 
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.id = ?
     `;
     con.query(sql, [id], (err, results) => {
@@ -274,11 +295,12 @@ app.get('/api/chapters/:id', (req, res) => {
 app.get('/api/library/:userId', (req, res) => {
     const { userId } = req.params;
     const sql = `
-        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name, c.name as category_name, l.added_at
+        SELECT s.*, s.thumbnail as cover_image, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            l.added_at
         FROM library l
         JOIN stories s ON l.story_id = s.id
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE l.user_id = ?
         ORDER BY l.added_at DESC
     `;
@@ -429,11 +451,12 @@ app.put('/api/users/:id/password', (req, res) => {
 app.get('/api/author/stories/:userId', (req, res) => {
     const { userId } = req.params;
     const sql = `
-        SELECT s.*, c.name as category_name,
+        SELECT s.*,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names,
+            (SELECT GROUP_CONCAT(sc.category_id ORDER BY sc.category_id) FROM story_categories sc WHERE sc.story_id = s.id) as category_ids,
             (SELECT COUNT(*) FROM chapters ch WHERE ch.story_id = s.id) as chapter_count,
             s.rejection_reason
         FROM stories s
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.author_id = ?
         ORDER BY s.updated_at DESC
     `;
@@ -445,12 +468,22 @@ app.get('/api/author/stories/:userId', (req, res) => {
 
 // 20. Đăng truyện mới
 app.post('/api/stories', (req, res) => {
-    const { title, description, thumbnail, author_id, category_id } = req.body;
-    const sql = `INSERT INTO stories (title, description, thumbnail, author_id, category_id, status) VALUES (?, ?, ?, ?, ?, 'pending')`;
-    con.query(sql, [title, description, thumbnail, author_id, category_id], (err, result) => {
-        if (err) return res.status(500).json({ status: "error", message: err.message });
-        res.json({ status: "success", id: result.insertId, message: "Đã gửi truyện để kiểm duyệt" });
-    });
+    const { title, description, thumbnail, author_id, category_ids } = req.body;
+    con.query(
+        `INSERT INTO stories (title, description, thumbnail, author_id, status) VALUES (?, ?, ?, ?, 'pending')`,
+        [title, description, thumbnail, author_id],
+        (err, result) => {
+            if (err) return res.status(500).json({ status: "error", message: err.message });
+            const storyId = result.insertId;
+            const ids = Array.isArray(category_ids) ? category_ids : [];
+            if (ids.length === 0) return res.json({ status: "success", id: storyId, message: "Đã gửi truyện để kiểm duyệt" });
+            const values = ids.map(cid => [storyId, cid]);
+            con.query(`INSERT IGNORE INTO story_categories (story_id, category_id) VALUES ?`, [values], (err2) => {
+                if (err2) return res.status(500).json({ status: "error", message: err2.message });
+                res.json({ status: "success", id: storyId, message: "Đã gửi truyện để kiểm duyệt" });
+            });
+        }
+    );
 });
 
 // 21. Thêm chương vào truyện (chapter_number tự động)
@@ -494,13 +527,22 @@ app.put('/api/chapters/:id', (req, res) => {
 // 20.1. Sửa thông tin truyện (tác giả)
 app.put('/api/stories/:id', (req, res) => {
     const { id } = req.params;
-    const { title, description, thumbnail, category_id } = req.body;
+    const { title, description, thumbnail, category_ids } = req.body;
     con.query(
-        `UPDATE stories SET title = ?, description = ?, thumbnail = ?, category_id = ?, updated_at = NOW() WHERE id = ?`,
-        [title, description, thumbnail, category_id, id],
+        `UPDATE stories SET title = ?, description = ?, thumbnail = ?, updated_at = NOW() WHERE id = ?`,
+        [title, description, thumbnail, id],
         (err) => {
             if (err) return res.status(500).json({ status: "error", message: err.message });
-            res.json({ status: "success" });
+            const ids = Array.isArray(category_ids) ? category_ids : [];
+            con.query(`DELETE FROM story_categories WHERE story_id = ?`, [id], (err2) => {
+                if (err2) return res.status(500).json({ status: "error", message: err2.message });
+                if (ids.length === 0) return res.json({ status: "success" });
+                const values = ids.map(cid => [id, cid]);
+                con.query(`INSERT IGNORE INTO story_categories (story_id, category_id) VALUES ?`, [values], (err3) => {
+                    if (err3) return res.status(500).json({ status: "error", message: err3.message });
+                    res.json({ status: "success" });
+                });
+            });
         }
     );
 });
@@ -636,10 +678,10 @@ app.put('/api/admin/users/:id/revoke-vip', (req, res) => {
 app.get('/api/admin/stories', (req, res) => {
     const { status = 'published' } = req.query;
     const sql = `
-        SELECT s.*, u.full_name as author_name, c.name as category_name
+        SELECT s.*, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.status = ?
         ORDER BY s.updated_at DESC
     `;
@@ -652,10 +694,10 @@ app.get('/api/admin/stories', (req, res) => {
 // 23. Lấy truyện chờ duyệt
 app.get('/api/admin/stories/pending', (req, res) => {
     const sql = `
-        SELECT s.*, u.full_name as author_name, c.name as category_name
+        SELECT s.*, u.full_name as author_name,
+            (SELECT GROUP_CONCAT(c.name ORDER BY c.id SEPARATOR ', ') FROM story_categories sc JOIN categories c ON sc.category_id = c.id WHERE sc.story_id = s.id) as category_names
         FROM stories s
         LEFT JOIN users u ON s.author_id = u.id
-        LEFT JOIN categories c ON s.category_id = c.id
         WHERE s.status = 'pending'
         ORDER BY s.created_at ASC
     `;

@@ -80,7 +80,7 @@ const SearchScreen = ({ navigation }) => {
 				</Text>
 				<View style={styles.cardMeta}>
 					<View style={styles.categoryPill}>
-						<Text style={styles.categoryPillText}>{item.category_name || "Khác"}</Text>
+						<Text style={styles.categoryPillText}>{item.category_names || "Khác"}</Text>
 					</View>
 					<Text style={styles.viewCount}>
 						<MaterialIcons name="visibility" size={12} color="#BBBBBB" /> {item.views || 0}

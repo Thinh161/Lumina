@@ -279,7 +279,7 @@ const ProfileScreen = ({ navigation }) => {
 											onPress={() => navigation.navigate("LibraryTab")}
 										>
 											<Image source={{ uri: item.cover_image || item.thumbnail }} style={styles.libraryCover} />
-											<Text style={styles.libraryTag}>{item.category_name || "Khác"}</Text>
+											<Text style={styles.libraryTag}>{item.category_names || "Khác"}</Text>
 											<Text style={styles.libraryName} numberOfLines={2}>{item.title}</Text>
 										</TouchableOpacity>
 									))}

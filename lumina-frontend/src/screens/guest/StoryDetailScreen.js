@@ -161,7 +161,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 						</View>
 
 						<View style={styles.metaSection}>
-							<Text style={styles.genre}>{currentStory.category_name?.toUpperCase() || "THỂ LOẠI"}</Text>
+							<Text style={styles.genre}>{currentStory.category_names?.toUpperCase() || "THỂ LOẠI"}</Text>
 							<Text style={styles.storyTitle}>{currentStory.title}</Text>
 							<View style={styles.authorRow}>
 								<View style={styles.authorIcon} />
@@ -235,7 +235,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 								{currentStory.description || "Chưa có tóm tắt nội dung cho truyện này."}
 							</Text>
 							<View style={styles.tagRow}>
-								{[`#${currentStory.category_name || "Novel"}`, "#Lumina"].map(tag => (
+								{[`#${currentStory.category_names || "Novel"}`, "#Lumina"].map(tag => (
 									<View key={tag} style={styles.tagChip}>
 										<Text style={styles.tagText}>{tag}</Text>
 									</View>
