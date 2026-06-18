@@ -264,8 +264,15 @@ app.put('/api/chapters/:id/view', (req, res) => {
                 if (err2) return res.status(500).json({ status: "error" });
                 con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(v),0) FROM (SELECT views v FROM chapters WHERE story_id = ?) t) WHERE id = ?`, [storyId, storyId], () => {});
                 con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
-                    if (!err3 && sRows[0] && sRows[0].views % 10 === 0 && sRows[0].views > 0) {
-                        con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [sRows[0].author_id], () => {});
+                    if (!err3 && sRows[0] && sRows[0].views > 0) {
+                        const v = sRows[0].views;
+                        const authorId = sRows[0].author_id;
+                        // Tác giả: 70% ~ +1 xu mỗi 10 view
+                        if (v % 10 === 0) con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [authorId], () => {});
+                        // Admin: 30% ~ +1 xu mỗi 33 view (xấp xỉ 30%)
+                        if (v % 33 === 0) con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                            if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 1 WHERE id = ?`, [admins[0].id], () => {});
+                        });
                     }
                 });
                 res.json({ status: "success" });
@@ -310,9 +317,16 @@ app.post('/api/stories/:id/purchase', (req, res) => {
             con.query(`SELECT balance FROM users WHERE id = ?`, [user_id], (err3, users) => {
                 if (err3 || !users[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user" });
                 if (users[0].balance < story.price_xu) return res.json({ status: "error", message: `Không đủ xu. Cần ${story.price_xu} xu.` });
+                const authorShare = Math.floor(story.price_xu * 0.7);
+                const adminShare = story.price_xu - authorShare;
                 con.query(`UPDATE users SET balance = balance - ? WHERE id = ?`, [story.price_xu, user_id], (err4) => {
                     if (err4) return res.status(500).json({ status: "error", message: err4.message });
-                    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [story.price_xu, story.author_id], () => {});
+                    // 70% cho tác giả
+                    con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [authorShare, story.author_id], () => {});
+                    // 30% cho admin
+                    con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                        if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [adminShare, admins[0].id], () => {});
+                    });
                     con.query(`INSERT INTO purchased_stories (user_id, story_id) VALUES (?, ?)`, [user_id, id], (err5) => {
                         if (err5) return res.status(500).json({ status: "error", message: err5.message });
                         res.json({ status: "success", message: `Đã mua "${story.title}" thành công!` });
