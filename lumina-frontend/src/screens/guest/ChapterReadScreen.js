@@ -28,7 +28,7 @@ const THEMES = {
 const ChapterReadScreen = ({ navigation, route }) => {
 	const { chapterId, storyId } = route.params || {};
 	const dispatch = useDispatch();
-	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked, vipBlockedMessage } = useSelector(state => state.story);
+	const { currentChapterContent, currentStory, currentChapters, loading, vipBlocked, vipBlockedMessage, purchaseBlocked, purchaseBlockedData } = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
 	const { items: libraryItems } = useSelector(state => state.library);
 	const scrollPositionRef = useRef(0);
@@ -90,6 +90,12 @@ const ChapterReadScreen = ({ navigation, route }) => {
 		}
 	}, [vipBlocked, navigation]);
 
+	useEffect(() => {
+		if (purchaseBlocked) {
+			navigation.replace("StoryDetail", { storyId: purchaseBlockedData?.story_id || storyId, showPurchase: true });
+		}
+	}, [purchaseBlocked, navigation]);
+
 	if (loading || (!currentChapterContent && !vipBlocked)) {
 		return (
 			<SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg, justifyContent: "center", alignItems: "center" }]}>
@@ -98,7 +104,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 		);
 	}
 
-	if (vipBlocked || !currentChapterContent) return null;
+	if (vipBlocked || purchaseBlocked || !currentChapterContent) return null;
 
 	const currentIndex = currentChapters?.findIndex(c => c.id === chapterId);
 	const nextChapter = (currentIndex !== -1 && currentIndex < currentChapters.length - 1)

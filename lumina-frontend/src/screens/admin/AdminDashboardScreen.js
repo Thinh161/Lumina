@@ -234,7 +234,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 				<Image source={{ uri: item.thumbnail || DEFAULT_COVER }} style={s.cover} />
 				<View style={s.cardInfo}>
 					<Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-					<Text style={s.cardMeta}>{item.author_name} • {item.category_name}</Text>
+					<Text style={s.cardMeta}>{item.author_name} • {item.category_names || ''}</Text>
 					<Text style={s.cardDesc} numberOfLines={2}>{item.description || "Không có mô tả."}</Text>
 					{item.rejection_reason ? <Text style={s.rejectionNote}>Lý do: {item.rejection_reason}</Text> : null}
 				</View>

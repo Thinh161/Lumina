@@ -24,7 +24,8 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stTitle, setStTitle] = useState('');
 	const [stDesc, setStDesc] = useState('');
 	const [stThumb, setStThumb] = useState('');
-	const [stCatId, setStCatId] = useState(null);
+	const [stCatIds, setStCatIds] = useState([]);
+	const [stPriceXu, setStPriceXu] = useState('0');
 	const [submitting, setSubmitting] = useState(false);
 
 	// Modal quản lý chương
@@ -67,7 +68,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 
 	const openNewStory = () => {
 		setEditingStory(null);
-		setStTitle(''); setStDesc(''); setStThumb(''); setStCatId(null);
+		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu('0');
 		setShowStoryModal(true);
 	};
 
@@ -76,12 +77,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 		setStTitle(story.title || '');
 		setStDesc(story.description || '');
 		setStThumb(story.thumbnail || '');
-		setStCatId(story.category_id || null);
+		setStCatIds(story.category_ids ? story.category_ids.split(',').map(Number) : []);
+		setStPriceXu(String(story.price_xu || 0));
 		setShowStoryModal(true);
 	};
 
 	const handleSubmitStory = async () => {
-		if (!stTitle.trim() || !stCatId) { Alert.alert("Lỗi", "Cần nhập tên và chọn thể loại."); return; }
+		if (!stTitle.trim() || stCatIds.length === 0) { Alert.alert("Lỗi", "Cần nhập tên và chọn ít nhất 1 thể loại."); return; }
 		setSubmitting(true);
 		try {
 			let res;
@@ -89,13 +91,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				res = await fetch(`${API_URL}/stories/${editingStory.id}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_id: stCatId }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
 				}).then(r => r.json());
 			} else {
 				res = await fetch(`${API_URL}/stories`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_id: stCatId }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
 				}).then(r => r.json());
 			}
 			if (res.status === "success") {
@@ -191,7 +193,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 					<Text style={[s.badgeText, { color: STATUS_COLOR[item.status] }]}>{STATUS_LABEL[item.status]}</Text>
 				</View>
 			</View>
-			<Text style={s.cardMeta}>{item.category_name} • {item.chapter_count} chương</Text>
+			<Text style={s.cardMeta}>{item.category_names || 'Chưa có thể loại'} • {item.chapter_count} chương</Text>
 			{item.status === 'rejected' && item.rejection_reason ? (
 				<View style={s.rejectionBox}>
 					<MaterialIcons name="info-outline" size={14} color="#D32F2F" />
@@ -281,13 +283,27 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
 							</View>
 							<View style={s.field}>
+								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí</Text>
+								<TextInput
+									style={s.input} value={stPriceXu} onChangeText={setStPriceXu}
+									placeholder="0" placeholderTextColor="#BBBBBB" keyboardType="numeric"
+								/>
+							</View>
+							<View style={s.field}>
 								<Text style={s.fieldLabel}>Thể loại *</Text>
 								<View style={s.chips}>
-									{categories.map(c => (
-										<TouchableOpacity key={c.id} style={[s.chip, stCatId === c.id && s.chipActive]} onPress={() => setStCatId(c.id)}>
-											<Text style={[s.chipText, stCatId === c.id && s.chipTextActive]}>{c.name}</Text>
-										</TouchableOpacity>
-									))}
+									{categories.map(c => {
+										const active = stCatIds.includes(c.id);
+										return (
+											<TouchableOpacity
+												key={c.id}
+												style={[s.chip, active && s.chipActive]}
+												onPress={() => setStCatIds(prev => active ? prev.filter(id => id !== c.id) : [...prev, c.id])}
+											>
+												<Text style={[s.chipText, active && s.chipTextActive]}>{c.name}</Text>
+											</TouchableOpacity>
+										);
+									})}
 								</View>
 							</View>
 							<TouchableOpacity style={[s.submitBtn, submitting && { opacity: 0.6 }]} onPress={handleSubmitStory} disabled={submitting}>

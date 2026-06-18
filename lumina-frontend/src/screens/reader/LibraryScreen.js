@@ -44,7 +44,7 @@ const LibraryScreen = ({ navigation }) => {
 					{item.author_name || "Ẩn danh"}
 				</Text>
 				<View style={styles.categoryPill}>
-					<Text style={styles.categoryText}>{item.category_name || "Khác"}</Text>
+					<Text style={styles.categoryText}>{item.category_names || "Khác"}</Text>
 				</View>
 				<Text style={styles.addedAt}>
 					Đã lưu: {new Date(item.added_at).toLocaleDateString("vi-VN")}

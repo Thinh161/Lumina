@@ -18,6 +18,7 @@ CREATE TABLE users (
     avatar VARCHAR(255),
     balance DECIMAL(15, 2) DEFAULT 0.00,
     is_vip BOOLEAN DEFAULT FALSE,
+    vip_expires_at DATETIME NULL,
     role_id INT,
     status ENUM('active', 'banned') DEFAULT 'active',
     author_request TINYINT DEFAULT 0,
@@ -39,14 +40,32 @@ CREATE TABLE stories (
     description TEXT,
     thumbnail VARCHAR(255),
     author_id INT,
-    category_id INT,
+    price_xu INT DEFAULT 0,
     status ENUM('pending', 'published', 'rejected') DEFAULT 'pending',
     rejection_reason TEXT NULL,
     views INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (author_id) REFERENCES users(id),
+    FOREIGN KEY (author_id) REFERENCES users(id)
+);
+
+-- 4.1. Bảng Thể loại của truyện (nhiều-nhiều)
+CREATE TABLE story_categories (
+    story_id INT NOT NULL,
+    category_id INT NOT NULL,
+    PRIMARY KEY (story_id, category_id),
+    FOREIGN KEY (story_id) REFERENCES stories(id),
     FOREIGN KEY (category_id) REFERENCES categories(id)
+);
+
+-- 4.2. Bảng Truyện đã mua
+CREATE TABLE purchased_stories (
+    user_id INT NOT NULL,
+    story_id INT NOT NULL,
+    purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, story_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (story_id) REFERENCES stories(id)
 );
 
 -- 5. Bảng Chương truyện
@@ -164,13 +183,18 @@ INSERT INTO categories (name, description) VALUES
 ('Ngôn Tình', 'Truyện tình cảm lãng mạn'),
 ('Hệ Thống', 'Nhân vật chính có hệ thống hỗ trợ');
 
-INSERT INTO stories (title, description, thumbnail, author_id, category_id, status) VALUES
+INSERT INTO stories (title, description, thumbnail, author_id, status) VALUES
 ('Phàm Nhân Tu Tiên', 'Hành trình của một người bình thường tu thành tiên.',
-'https://s3.cloud.cmctelecom.vn/2game-vn/pictures/2game/2017/09/25/2game-truyen-pham-nhan-tu-tien-vng-anh-7.jpg', 2, 1, 'published'),
+'https://s3.cloud.cmctelecom.vn/2game-vn/pictures/2game/2017/09/25/2game-truyen-pham-nhan-tu-tien-vng-anh-7.jpg', 2, 'published'),
 ('Tiếu Ngạo Giang Hồ', 'Kiếm hiệp Kim Dung kinh điển.',
-'https://307a0e78.vws.vegacdn.vn/view/v2/image/img.book/0/0/0/19289.jpg?v=1&w=480&h=700', 2, 2, 'published'),
+'https://307a0e78.vws.vegacdn.vn/view/v2/image/img.book/0/0/0/19289.jpg?v=1&w=480&h=700', 2, 'published'),
 ('Sống Cùng Hệ Thống', 'Xuyên không và có bàn tay vàng.',
-'https://i.imgur.com/7ABCD12.jpg', 2, 4, 'pending');
+'https://i.imgur.com/7ABCD12.jpg', 2, 'pending');
+
+INSERT INTO story_categories (story_id, category_id) VALUES
+(1, 1), -- Phàm Nhân Tu Tiên: Tiên Hiệp
+(2, 2), -- Tiếu Ngạo Giang Hồ: Kiếm Hiệp
+(3, 4); -- Sống Cùng Hệ Thống: Hệ Thống
 
 INSERT INTO chapters (story_id, chapter_number, title, content) VALUES
 (1, 1, 'Khởi đầu',

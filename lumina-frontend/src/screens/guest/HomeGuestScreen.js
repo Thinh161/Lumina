@@ -53,7 +53,7 @@ const HomeGuestScreen = ({ navigation }) => {
 		} catch { Alert.alert("Lỗi", "Không thể mở chương."); }
 	};
 
-	const filtered = selectedCat ? stories.filter(s => s.category_id === selectedCat) : stories;
+	const filtered = selectedCat ? stories.filter(s => s.category_ids?.split(',').map(Number).includes(selectedCat)) : stories;
 
 	if (loading && stories.length === 0) {
 		return <SafeAreaView style={s.safe}><ActivityIndicator size="large" color="#8B4513" style={{ flex: 1 }} /></SafeAreaView>;
@@ -105,7 +105,7 @@ const HomeGuestScreen = ({ navigation }) => {
 						<Image source={{ uri: filtered[0].cover_image || DEFAULT_IMG }} style={s.featuredImg} />
 						<View style={s.featuredInfo}>
 							<View style={s.catTag}>
-								<Text style={s.catTagText}>{filtered[0].category_name}</Text>
+								<Text style={s.catTagText}>{filtered[0].category_names}</Text>
 							</View>
 							<Text style={s.featuredTitle} numberOfLines={2}>{filtered[0].title}</Text>
 							<Text style={s.featuredAuthor}>{filtered[0].author_name}</Text>
@@ -165,7 +165,7 @@ const HomeGuestScreen = ({ navigation }) => {
 							<Text style={s.cardTitle} numberOfLines={2}>{story.title}</Text>
 							<Text style={s.cardAuthor} numberOfLines={1}>{story.author_name}</Text>
 							<View style={s.cardMeta}>
-								<View style={s.catPill}><Text style={s.catPillText}>{story.category_name}</Text></View>
+								<View style={s.catPill}><Text style={s.catPillText}>{story.category_names}</Text></View>
 								<Text style={s.views}>
 									<MaterialIcons name="visibility" size={11} color="#BBBBBB" /> {story.views || 0}
 								</Text>
