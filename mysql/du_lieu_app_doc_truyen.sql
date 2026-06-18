@@ -18,6 +18,7 @@ CREATE TABLE users (
     avatar VARCHAR(255),
     balance DECIMAL(15, 2) DEFAULT 0.00,
     is_vip BOOLEAN DEFAULT FALSE,
+    vip_expires_at DATETIME NULL,
     role_id INT,
     status ENUM('active', 'banned') DEFAULT 'active',
     author_request TINYINT DEFAULT 0,

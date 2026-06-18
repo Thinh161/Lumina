@@ -42,6 +42,10 @@ con.connect(function (err) {
     con.query(`ALTER TABLE users ADD COLUMN author_request TINYINT DEFAULT 0`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('author_request col:', e.message);
     });
+    // Thêm cột vip_expires_at vào users nếu chưa có
+    con.query(`ALTER TABLE users ADD COLUMN vip_expires_at DATETIME NULL`, (e) => {
+        if (e && !e.message.includes('Duplicate column')) console.log('vip_expires_at col:', e.message);
+    });
     // Thêm cột rejection_reason vào stories nếu chưa có
     con.query(`ALTER TABLE stories ADD COLUMN rejection_reason TEXT NULL`, (e) => {
         if (e && !e.message.includes('Duplicate column')) console.log('rejection_reason col:', e.message);
@@ -130,7 +134,7 @@ app.post('/api/login', (req, res) => {
 app.get('/api/users/:id', (req, res) => {
     const { id } = req.params;
     const sql = `
-        SELECT id, username, email, full_name, avatar, balance, is_vip, role_id, status, created_at, author_request
+        SELECT id, username, email, full_name, avatar, balance, is_vip, vip_expires_at, role_id, status, created_at, author_request
         FROM users
         WHERE id = ?
     `;
@@ -280,11 +284,12 @@ app.get('/api/chapters/:id', (req, res) => {
         });
         const lockedMsg = `Chương này sẽ mở khóa vào ${unlockDate}. Thành viên VIP có thể đọc ngay.`;
         if (!user_id) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
-        con.query(`SELECT is_vip, role_id FROM users WHERE id = ?`, [user_id], (err2, users) => {
+        con.query(`SELECT is_vip, vip_expires_at, role_id FROM users WHERE id = ?`, [user_id], (err2, users) => {
             if (err2 || !users[0]) return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
             const u = users[0];
-            // VIP, Admin (role_id=1), Author (role_id=2) được đọc trước ngày mở khóa
-            if (!u.is_vip && u.role_id !== 1 && u.role_id !== 2)
+            const vipActive = u.is_vip && (!u.vip_expires_at || new Date(u.vip_expires_at) > new Date());
+            // VIP còn hạn, Admin (role_id=1), Author (role_id=2) được đọc trước ngày mở khóa
+            if (!vipActive && u.role_id !== 1 && u.role_id !== 2)
                 return res.status(403).json({ status: "error", code: "VIP_REQUIRED", message: lockedMsg, unlock_at: chapter.unlock_at });
             res.json({ status: "success", data: chapter });
         });
@@ -576,18 +581,33 @@ app.get('/api/history/:userId', (req, res) => {
     });
 });
 
-// 29. Mua VIP bằng xu (1000 xu, vĩnh viễn)
+// 29. Mua VIP bằng xu
 app.put('/api/users/:id/buy-vip', (req, res) => {
     const { id } = req.params;
-    con.query(`SELECT balance, is_vip FROM users WHERE id = ?`, [id], (err, results) => {
+    const { xu, months } = req.body; // months = null => vĩnh viễn
+    if (!xu || xu <= 0) return res.status(400).json({ status: "error", message: "Thiếu thông tin gói VIP." });
+    con.query(`SELECT balance, is_vip, vip_expires_at FROM users WHERE id = ?`, [id], (err, results) => {
         if (err || !results[0]) return res.status(404).json({ status: "error", message: "Không tìm thấy user" });
         const u = results[0];
-        if (u.is_vip) return res.json({ status: "error", message: "Bạn đã là VIP rồi" });
-        if (u.balance < 1000) return res.json({ status: "error", message: "Không đủ xu. Cần 1000 xu." });
-        con.query(`UPDATE users SET balance = balance - 1000, is_vip = 1 WHERE id = ?`, [id], (err2) => {
-            if (err2) return res.status(500).json({ status: "error", message: err2.message });
-            res.json({ status: "success", message: "Đã kích hoạt VIP thành công!" });
-        });
+        if (u.balance < xu) return res.json({ status: "error", message: `Không đủ xu. Cần ${xu} xu.` });
+        // Tính ngày hết hạn: nếu months null => vĩnh viễn (vip_expires_at = null)
+        // Nếu đang còn VIP, gia hạn từ ngày hết hạn cũ, không từ hôm nay
+        let expiresAt = null;
+        if (months) {
+            const base = (u.is_vip && u.vip_expires_at && new Date(u.vip_expires_at) > new Date())
+                ? new Date(u.vip_expires_at)
+                : new Date();
+            base.setMonth(base.getMonth() + months);
+            expiresAt = base.toISOString().slice(0, 19).replace('T', ' ');
+        }
+        con.query(
+            `UPDATE users SET balance = balance - ?, is_vip = 1, vip_expires_at = ? WHERE id = ?`,
+            [xu, expiresAt, id],
+            (err2) => {
+                if (err2) return res.status(500).json({ status: "error", message: err2.message });
+                res.json({ status: "success", message: "Đã kích hoạt VIP thành công!", vip_expires_at: expiresAt });
+            }
+        );
     });
 });
 
