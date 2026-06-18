@@ -25,7 +25,8 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stDesc, setStDesc] = useState('');
 	const [stThumb, setStThumb] = useState('');
 	const [stCatIds, setStCatIds] = useState([]);
-	const [stPriceXu, setStPriceXu] = useState('0');
+	const [stPriceXu, setStPriceXu] = useState('');
+	const [stIsPaid, setStIsPaid] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	// Modal quản lý chương
@@ -68,7 +69,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 
 	const openNewStory = () => {
 		setEditingStory(null);
-		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu('0');
+		setStTitle(''); setStDesc(''); setStThumb(''); setStCatIds([]); setStPriceXu(''); setStIsPaid(false);
 		setShowStoryModal(true);
 	};
 
@@ -78,14 +79,16 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 		setStDesc(story.description || '');
 		setStThumb(story.thumbnail || '');
 		setStCatIds(story.category_ids ? story.category_ids.split(',').map(Number) : []);
-		setStPriceXu(String(story.price_xu || 0));
+		const paid = (story.price_xu || 0) > 0;
+		setStIsPaid(paid);
+		setStPriceXu(paid ? String(story.price_xu) : '');
 		setShowStoryModal(true);
 	};
 
 	const handleSubmitStory = async () => {
 		if (!stTitle.trim() || stCatIds.length === 0) { Alert.alert("Lỗi", "Cần nhập tên và chọn ít nhất 1 thể loại."); return; }
-		const priceVal = parseInt(stPriceXu) || 0;
-		if (priceVal > 0 && priceVal < 100) { Alert.alert("Lỗi", "Giá tối thiểu là 100 xu (hoặc 0 để miễn phí)."); return; }
+		const priceVal = stIsPaid ? (parseInt(stPriceXu) || 0) : 0;
+		if (stIsPaid && priceVal < 100) { Alert.alert("Lỗi", "Giá tối thiểu là 100 xu."); return; }
 		setSubmitting(true);
 		try {
 			let res;
@@ -93,13 +96,13 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 				res = await fetch(`${API_URL}/stories/${editingStory.id}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: priceVal }),
 				}).then(r => r.json());
 			} else {
 				res = await fetch(`${API_URL}/stories`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: parseInt(stPriceXu) || 0 }),
+					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: priceVal }),
 				}).then(r => r.json());
 			}
 			if (res.status === "success") {
@@ -285,14 +288,32 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 								<TextInput style={[s.input, { height: 80 }]} value={stDesc} onChangeText={setStDesc} placeholder="Tóm tắt nội dung..." placeholderTextColor="#BBBBBB" multiline />
 							</View>
 							<View style={s.field}>
-								<Text style={s.fieldLabel}>Giá đọc (xu) — 0 = miễn phí, tối thiểu 100 xu</Text>
-								<TextInput
-									style={[s.input, (parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100) && { borderColor: '#D32F2F' }]}
-									value={stPriceXu} onChangeText={setStPriceXu}
-									placeholder="0" placeholderTextColor="#BBBBBB" keyboardType="numeric"
-								/>
-								{parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100 && (
-									<Text style={{ color: '#D32F2F', fontSize: 11, marginTop: 2 }}>Tối thiểu 100 xu</Text>
+								<Text style={s.fieldLabel}>Loại truyện</Text>
+								<View style={{ flexDirection: 'row', gap: 8 }}>
+									<TouchableOpacity
+										style={[s.chip, !stIsPaid && s.chipActive]}
+										onPress={() => { setStIsPaid(false); setStPriceXu(''); }}
+									>
+										<Text style={[s.chipText, !stIsPaid && s.chipTextActive]}>Miễn phí</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[s.chip, stIsPaid && s.chipActive]}
+										onPress={() => setStIsPaid(true)}
+									>
+										<Text style={[s.chipText, stIsPaid && s.chipTextActive]}>Trả phí</Text>
+									</TouchableOpacity>
+								</View>
+								{stIsPaid && (
+									<>
+										<TextInput
+											style={[s.input, { marginTop: 8 }, (parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100) && { borderColor: '#D32F2F' }]}
+											value={stPriceXu} onChangeText={setStPriceXu}
+											placeholder="Nhập giá (tối thiểu 100 xu)" placeholderTextColor="#BBBBBB" keyboardType="numeric"
+										/>
+										{parseInt(stPriceXu) > 0 && parseInt(stPriceXu) < 100 && (
+											<Text style={{ color: '#D32F2F', fontSize: 11, marginTop: 2 }}>Tối thiểu 100 xu</Text>
+										)}
+									</>
 								)}
 							</View>
 							<View style={s.field}>
