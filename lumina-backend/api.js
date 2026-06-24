@@ -99,26 +99,23 @@ con.connect(function (err) {
         if (e && !e.message.includes('Duplicate column')) console.log('chapters.views col:', e.message);
     });
     con.query(`
-        CREATE TABLE IF NOT EXISTS chapter_views (
-            user_id INT NOT NULL,
-            chapter_id INT NOT NULL,
-            PRIMARY KEY (user_id, chapter_id)
+        CREATE TABLE IF NOT EXISTS story_views (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT DEFAULT NULL,
+            guest_ip VARCHAR(45) DEFAULT NULL,
+            story_id INT NOT NULL,
+            viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_story (user_id, story_id),
+            INDEX idx_ip_story (guest_ip, story_id)
         )
-    `, (e) => { if (e) console.log('chapter_views table:', e.message); });
+    `, (e) => { if (e) console.log('story_views table:', e.message); });
     con.query(`
         CREATE TABLE IF NOT EXISTS story_categories (
             story_id INT NOT NULL,
             category_id INT NOT NULL,
             PRIMARY KEY (story_id, category_id)
         )
-    `, (e) => {
-        if (e) { console.log('story_categories table:', e.message); return; }
-        // Migrate dữ liệu cũ từ stories.category_id sang story_categories
-        con.query(`
-            INSERT IGNORE INTO story_categories (story_id, category_id)
-            SELECT id, category_id FROM stories WHERE category_id IS NOT NULL
-        `, (e2) => { if (e2) console.log('migrate story_categories:', e2.message); });
-    });
+    `, (e) => { if (e) console.log('story_categories table:', e.message); });
 });
 
 // ================= API ENDPOINTS =================
@@ -255,35 +252,48 @@ app.get('/api/stories/search', (req, res) => {
 app.put('/api/chapters/:id/view', (req, res) => {
     const { id } = req.params;
     const { user_id } = req.body;
+    const guestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+    const COOLDOWN_HOURS = 1;
+
+    // Lấy story_id từ chapter
     con.query(`SELECT story_id FROM chapters WHERE id = ?`, [id], (err, rows) => {
         if (err || !rows[0]) return res.status(404).json({ status: "error" });
         const storyId = rows[0].story_id;
 
-        const doCount = () => {
-            con.query(`UPDATE chapters SET views = views + 1 WHERE id = ?`, [id], (err2) => {
-                if (err2) return res.status(500).json({ status: "error" });
-                con.query(`UPDATE stories SET views = (SELECT COALESCE(SUM(v),0) FROM (SELECT views v FROM chapters WHERE story_id = ?) t) WHERE id = ?`, [storyId, storyId], () => {});
-                con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err3, sRows) => {
-                    if (!err3 && sRows[0] && sRows[0].views > 0 && sRows[0].views % 100 === 0) {
-                        const authorId = sRows[0].author_id;
-                        // Mỗi 100 view: tổng 10 xu → tác giả 7, admin 3
-                        con.query(`UPDATE users SET balance = balance + 7 WHERE id = ?`, [authorId], () => {});
-                        con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
-                            if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 3 WHERE id = ?`, [admins[0].id], () => {});
-                        });
-                    }
-                });
-                res.json({ status: "success" });
-            });
-        };
+        // Cooldown check theo story_id
+        const [checkSql, checkParams] = user_id
+            ? [`SELECT 1 FROM story_views WHERE user_id = ? AND story_id = ? AND viewed_at > DATE_SUB(NOW(), INTERVAL ? HOUR) LIMIT 1`, [user_id, storyId, COOLDOWN_HOURS]]
+            : [`SELECT 1 FROM story_views WHERE guest_ip = ? AND story_id = ? AND viewed_at > DATE_SUB(NOW(), INTERVAL ? HOUR) LIMIT 1`, [guestIp, storyId, COOLDOWN_HOURS]];
 
-        if (!user_id) return doCount(); // Guest: đếm 1 lần/phiên (client tự kiểm soát)
-
-        // Logged-in: chỉ đếm nếu chưa từng xem chương này
-        con.query(`INSERT IGNORE INTO chapter_views (user_id, chapter_id) VALUES (?, ?)`, [user_id, id], (err2, result) => {
+        con.query(checkSql, checkParams, (err2, recent) => {
             if (err2) return res.status(500).json({ status: "error" });
-            if (result.affectedRows === 0) return res.json({ status: "already_counted" }); // đã xem rồi
-            doCount();
+            if (recent && recent.length > 0) return res.json({ status: "cooldown" });
+
+            // Ghi nhận view mới
+            const [insertSql, insertParams] = user_id
+                ? [`INSERT INTO story_views (user_id, story_id) VALUES (?, ?)`, [user_id, storyId]]
+                : [`INSERT INTO story_views (guest_ip, story_id) VALUES (?, ?)`, [guestIp, storyId]];
+
+            con.query(insertSql, insertParams, (err3) => {
+                if (err3) return res.status(500).json({ status: "error" });
+
+                // Tăng view truyện trực tiếp
+                con.query(`UPDATE stories SET views = views + 1 WHERE id = ?`, [storyId], (err4) => {
+                    if (err4) return res.status(500).json({ status: "error" });
+
+                    // Kiểm tra mốc 100 view để chia doanh thu
+                    con.query(`SELECT views, author_id FROM stories WHERE id = ?`, [storyId], (err5, sRows) => {
+                        if (!err5 && sRows[0] && sRows[0].views % 100 === 0) {
+                            const authorId = sRows[0].author_id;
+                            con.query(`UPDATE users SET balance = balance + 7 WHERE id = ?`, [authorId], () => {});
+                            con.query(`SELECT id FROM users WHERE role_id = 1 LIMIT 1`, [], (e, admins) => {
+                                if (!e && admins[0]) con.query(`UPDATE users SET balance = balance + 3 WHERE id = ?`, [admins[0].id], () => {});
+                            });
+                        }
+                    });
+                    res.json({ status: "success" });
+                });
+            });
         });
     });
 });

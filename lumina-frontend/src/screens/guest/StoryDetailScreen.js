@@ -1,86 +1,56 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
-	View,
-	Text,
-	StyleSheet,
-	SafeAreaView,
-	ScrollView,
-	Image,
-	TouchableOpacity,
-	ActivityIndicator,
-	Alert,
-	TextInput,
-	Share,
+	View, Text, StyleSheet, SafeAreaView, ScrollView, Image,
+	TouchableOpacity, ActivityIndicator, Alert, TextInput, Share,
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchStoryDetails, fetchChapters, clearCurrentStory } from "../../redux_thunk/StorySlice";
+import {
+	fetchStoryDetails, fetchChapters, clearCurrentStory,
+	fetchStoryComments, postComment, deleteComment, editComment,
+	fetchBookmark, fetchPurchaseStatus, purchaseStory,
+} from "../../redux_thunk/StorySlice";
 import { addToLibrary, removeFromLibrary, fetchLibrary } from "../../redux_thunk/LibrarySlice";
-
-import { API_URL } from '../../config/api';
 import { confirmAlert } from '../../utils/confirmAlert';
+
 const DEFAULT_STORY_IMAGE = "https://lh3.googleusercontent.com/aida-public/AB6AXuBvQzYRtYjISxgN15SaT96ZzRp0uhBsLi8dtlvBxtguAe6xQdLmGTT2DPmYgyXdBP9vHMV4o_Y-0WGc0cf6j7bsZDbN4nbabvlvhk20QmITP7ODv5EnXRTGOfvT6ng5cYr2q7IczdQCFVBcnqUent2OjsU41hp7ym-gHYBYq3eBKXIb7MKUQvkoAZctRNEzkIKwQl2okLEZv0nlLr7XzWyP7sNX8e_kGu814cdSoyr5V2dMljfbJGiav9so7PC7k4udoHlX6nakoD8";
 
 const StoryDetailScreen = ({ navigation, route }) => {
 	const { storyId } = route.params || {};
 	const dispatch = useDispatch();
-	const { currentStory, currentChapters, loading } = useSelector(state => state.story);
+	const {
+		currentStory, currentChapters, loading,
+		comments, commentsLoading,
+		bookmark,
+		priceXu, hasPurchased, purchaseLoading,
+	} = useSelector(state => state.story);
 	const { user } = useSelector(state => state.auth);
 	const { items: libraryItems } = useSelector(state => state.library);
-	const [libraryLoading, setLibraryLoading] = useState(false);
 
 	const isInLibrary = !!user && user.role_id !== 1 && libraryItems.some(item => item.id === storyId);
+	const canRead = !priceXu || hasPurchased || user?.is_vip || user?.role_id === 1 || user?.role_id === 2;
 
-	const [comments, setComments] = useState([]);
+	const [libraryLoading, setLibraryLoading] = useState(false);
 	const [commentText, setCommentText] = useState('');
 	const [rating, setRating] = useState(5);
 	const [postingComment, setPostingComment] = useState(false);
-
 	const [editingCommentId, setEditingCommentId] = useState(null);
 	const [editingText, setEditingText] = useState('');
-
-	const [bookmark, setBookmark] = useState(null);
 	const [showAllChapters, setShowAllChapters] = useState(false);
-	const CHAPTERS_PREVIEW = 5;
-
-	const [priceXu, setPriceXu] = useState(0);
-	const [hasPurchased, setHasPurchased] = useState(false);
 	const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-	const [purchaseLoading, setPurchaseLoading] = useState(false);
-
-	const loadComments = useCallback(async () => {
-		if (!storyId) return;
-		try {
-			const data = await fetch(`${API_URL}/stories/${storyId}/comments`).then(r => r.json());
-			if (data.status === "success") setComments(data.data);
-		} catch {}
-	}, [storyId]);
-
-	const loadBookmark = useCallback(async () => {
-		if (!user || !storyId) return;
-		try {
-			const data = await fetch(`${API_URL}/bookmarks/${user.id}/${storyId}`).then(r => r.json());
-			if (data.status === "success" && data.data) setBookmark(data.data);
-		} catch {}
-	}, [user, storyId]);
+	const CHAPTERS_PREVIEW = 5;
 
 	useEffect(() => {
 		if (storyId) {
 			dispatch(fetchStoryDetails(storyId));
 			dispatch(fetchChapters(storyId));
-			loadComments();
-			loadBookmark();
-			// Lấy trạng thái mua truyện
-			const uid = user?.id ? `?user_id=${user.id}` : '';
-			fetch(`${API_URL}/stories/${storyId}/purchase-status${uid}`)
-				.then(r => r.json())
-				.then(d => { if (d.status === 'success') { setPriceXu(d.price_xu || 0); setHasPurchased(d.has_purchased); } })
-				.catch(() => {});
+			dispatch(fetchStoryComments(storyId));
+			dispatch(fetchPurchaseStatus({ storyId, userId: user?.id }));
+			if (user) dispatch(fetchBookmark({ userId: user.id, storyId }));
 		}
 		return () => { dispatch(clearCurrentStory()); };
-	}, [dispatch, storyId, loadComments, loadBookmark, user?.id]);
+	}, [dispatch, storyId, user?.id]);
 
-	// Mở modal mua khi được redirect từ ChapterReadScreen
 	useEffect(() => {
 		if (route.params?.showPurchase && priceXu > 0 && !hasPurchased) {
 			setShowPurchaseModal(true);
@@ -89,77 +59,48 @@ const StoryDetailScreen = ({ navigation, route }) => {
 
 	const handlePurchaseStory = async () => {
 		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để mua truyện."); return; }
-		setPurchaseLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/stories/${storyId}/purchase`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ user_id: user.id }),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				setHasPurchased(true);
-				setShowPurchaseModal(false);
-				Alert.alert("Thành công", res.message);
-			} else {
-				Alert.alert("Lỗi", res.message);
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối."); }
-		finally { setPurchaseLoading(false); }
+			const msg = await dispatch(purchaseStory({ storyId, userId: user.id })).unwrap();
+			setShowPurchaseModal(false);
+			Alert.alert("Thành công", msg);
+		} catch (err) {
+			Alert.alert("Lỗi", err);
+		}
 	};
-
-	const canRead = !priceXu || hasPurchased || user?.is_vip || user?.role_id === 1 || user?.role_id === 2;
 
 	const handlePostComment = async () => {
 		if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để bình luận."); return; }
 		if (!commentText.trim()) return;
 		setPostingComment(true);
 		try {
-			const res = await fetch(`${API_URL}/comments`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ user_id: user.id, story_id: storyId, content: commentText.trim(), rating }),
-			}).then(r => r.json());
-			if (res.status === "success") { setCommentText(''); loadComments(); }
-		} finally { setPostingComment(false); }
+			await dispatch(postComment({ userId: user.id, storyId, content: commentText.trim(), rating })).unwrap();
+			setCommentText('');
+			dispatch(fetchStoryComments(storyId));
+		} catch {} finally { setPostingComment(false); }
 	};
 
 	const handleDeleteComment = (commentId) => {
 		confirmAlert("Xóa bình luận", "Bạn muốn xóa bình luận này?", async () => {
 			try {
-				await fetch(`${API_URL}/comments/${commentId}/${user.id}`, { method: 'DELETE' });
-				setComments(prev => prev.filter(c => c.id !== commentId));
+				await dispatch(deleteComment({ commentId, userId: user.id })).unwrap();
 			} catch {}
 		}, true);
-	};
-
-	const handleEditComment = (comment) => {
-		setEditingCommentId(comment.id);
-		setEditingText(comment.content);
 	};
 
 	const handleSaveEditComment = async (commentId) => {
 		if (!editingText.trim()) return;
 		try {
-			const res = await fetch(`${API_URL}/comments/${commentId}/${user.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content: editingText.trim() }),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: editingText.trim() } : c));
-				setEditingCommentId(null);
-			} else {
-				Alert.alert("Lỗi", res.message);
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối."); }
+			await dispatch(editComment({ commentId, userId: user.id, content: editingText.trim() })).unwrap();
+			setEditingCommentId(null);
+		} catch (err) {
+			Alert.alert("Lỗi", err);
+		}
 	};
 
 	const handleShare = async () => {
 		if (!currentStory) return;
 		try {
-			await Share.share({
-				message: `Đọc "${currentStory.title}" của ${currentStory.author_name} trên ứng dụng Lumina!`,
-			});
+			await Share.share({ message: `Đọc "${currentStory.title}" của ${currentStory.author_name} trên ứng dụng Lumina!` });
 		} catch {}
 	};
 
@@ -225,51 +166,44 @@ const StoryDetailScreen = ({ navigation, route }) => {
 
 					<View style={styles.actionsRow}>
 						{priceXu > 0 && !canRead ? (
-							<TouchableOpacity
-								style={[styles.actionButton, styles.actionPrimary, { backgroundColor: '#C0392B' }]}
-								onPress={() => setShowPurchaseModal(true)}
-							>
+							<TouchableOpacity style={[styles.actionButton, styles.actionPrimary, { backgroundColor: '#C0392B' }]} onPress={() => setShowPurchaseModal(true)}>
 								<MaterialIcons name="lock" size={18} color="#FFFFFF" />
 								<Text style={styles.actionPrimaryText}>Mua truyện — {priceXu} xu</Text>
 							</TouchableOpacity>
 						) : bookmark ? (
-							<TouchableOpacity
-								style={[styles.actionButton, styles.actionPrimary]}
-								onPress={() => navigation.navigate("ChapterRead", { chapterId: bookmark.chapter_id, storyId: currentStory.id })}
-							>
+							<TouchableOpacity style={[styles.actionButton, styles.actionPrimary]} onPress={() => navigation.navigate("ChapterRead", { chapterId: bookmark.chapter_id, storyId: currentStory.id })}>
 								<MaterialIcons name="bookmark" size={18} color="#FFFFFF" />
 								<Text style={styles.actionPrimaryText}>Tiếp tục Chương {bookmark.chapter_number}</Text>
 							</TouchableOpacity>
 						) : (
-							<TouchableOpacity
-								style={[styles.actionButton, styles.actionPrimary]}
-								onPress={() => currentChapters.length > 0 && navigation.navigate("ChapterRead", { chapterId: currentChapters[0].id, storyId: currentStory.id })}
-							>
+							<TouchableOpacity style={[styles.actionButton, styles.actionPrimary]} onPress={() => currentChapters.length > 0 && navigation.navigate("ChapterRead", { chapterId: currentChapters[0].id, storyId: currentStory.id })}>
 								<MaterialIcons name="menu-book" size={18} color="#FFFFFF" />
 								<Text style={styles.actionPrimaryText}>Đọc Ngay</Text>
 							</TouchableOpacity>
 						)}
-						{user?.role_id !== 1 && <TouchableOpacity
-							style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
-							disabled={libraryLoading}
-							onPress={async () => {
-								if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện."); return; }
-								setLibraryLoading(true);
-								try {
-									if (isInLibrary) {
-										await dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId })).unwrap();
-									} else {
-										await dispatch(addToLibrary({ user_id: user.id, story_id: storyId })).unwrap();
-										dispatch(fetchLibrary(user.id));
-									}
-								} finally { setLibraryLoading(false); }
-							}}
-						>
-							<MaterialIcons name={isInLibrary ? "bookmark" : "bookmark-border"} size={18} color={isInLibrary ? "#8B4513" : "#1A1A1A"} />
-							<Text style={[styles.actionGhostText, isInLibrary && { color: "#8B4513" }]}>
-								{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
-							</Text>
-						</TouchableOpacity>}
+						{user?.role_id !== 1 && (
+							<TouchableOpacity
+								style={[styles.actionButtonGhost, isInLibrary && styles.actionButtonSaved]}
+								disabled={libraryLoading}
+								onPress={async () => {
+									if (!user) { Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để lưu truyện."); return; }
+									setLibraryLoading(true);
+									try {
+										if (isInLibrary) {
+											await dispatch(removeFromLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+										} else {
+											await dispatch(addToLibrary({ user_id: user.id, story_id: storyId })).unwrap();
+											dispatch(fetchLibrary(user.id));
+										}
+									} finally { setLibraryLoading(false); }
+								}}
+							>
+								<MaterialIcons name={isInLibrary ? "bookmark" : "bookmark-border"} size={18} color={isInLibrary ? "#8B4513" : "#1A1A1A"} />
+								<Text style={[styles.actionGhostText, isInLibrary && { color: "#8B4513" }]}>
+									{libraryLoading ? "..." : isInLibrary ? "Đã Lưu" : "Lưu Truyện"}
+								</Text>
+							</TouchableOpacity>
+						)}
 					</View>
 
 					<View style={styles.contentRow}>
@@ -283,9 +217,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 							</Text>
 							<View style={styles.tagRow}>
 								{[`#${currentStory.category_names || "Novel"}`, "#Lumina"].map(tag => (
-									<View key={tag} style={styles.tagChip}>
-										<Text style={styles.tagText}>{tag}</Text>
-									</View>
+									<View key={tag} style={styles.tagChip}><Text style={styles.tagText}>{tag}</Text></View>
 								))}
 							</View>
 						</View>
@@ -321,22 +253,17 @@ const StoryDetailScreen = ({ navigation, route }) => {
 										);
 									})
 								) : (
-									<Text style={{ textAlign: "center", color: "#888888", marginVertical: 10 }}>
-										Truyện chưa cập nhật chương nào.
-									</Text>
+									<Text style={{ textAlign: "center", color: "#888888", marginVertical: 10 }}>Truyện chưa cập nhật chương nào.</Text>
 								)}
 							</View>
 							{currentChapters.length > CHAPTERS_PREVIEW && (
 								<TouchableOpacity style={styles.viewAllButton} onPress={() => setShowAllChapters(!showAllChapters)}>
-									<Text style={styles.viewAllText}>
-										{showAllChapters ? "Thu gọn" : `Xem tất cả ${currentChapters.length} chương`}
-									</Text>
+									<Text style={styles.viewAllText}>{showAllChapters ? "Thu gọn" : `Xem tất cả ${currentChapters.length} chương`}</Text>
 									<MaterialIcons name={showAllChapters ? "expand-less" : "expand-more"} size={18} color="#8B4513" />
 								</TouchableOpacity>
 							)}
 						</View>
 
-						{/* BÌNH LUẬN */}
 						<View style={styles.commentsSection}>
 							<View style={styles.sectionHeader}>
 								<Text style={styles.sectionTitle}>Bình Luận</Text>
@@ -375,7 +302,9 @@ const StoryDetailScreen = ({ navigation, route }) => {
 								</View>
 							</View>
 
-							{comments.length === 0 ? (
+							{commentsLoading ? (
+								<ActivityIndicator color="#8B4513" style={{ marginVertical: 12 }} />
+							) : comments.length === 0 ? (
 								<Text style={styles.noComments}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
 							) : (
 								comments.map(c => (
@@ -393,7 +322,7 @@ const StoryDetailScreen = ({ navigation, route }) => {
 														</View>
 													)}
 													{user?.id === c.user_id && editingCommentId !== c.id && (
-														<TouchableOpacity onPress={() => handleEditComment(c)}>
+														<TouchableOpacity onPress={() => { setEditingCommentId(c.id); setEditingText(c.content); }}>
 															<MaterialIcons name="edit" size={15} color="#8B4513" />
 														</TouchableOpacity>
 													)}
@@ -455,7 +384,6 @@ const StoryDetailScreen = ({ navigation, route }) => {
 				)}
 			</View>
 
-			{/* Modal mua truyện */}
 			{showPurchaseModal && (
 				<View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
 					<View style={{ backgroundColor: '#FFF', borderRadius: 16, padding: 24, width: '100%', gap: 14 }}>

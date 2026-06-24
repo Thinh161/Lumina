@@ -7,16 +7,19 @@ import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserProfile, logout } from "../../redux_thunk/AuthSlice";
 import { fetchLibrary } from "../../redux_thunk/LibrarySlice";
+import { fetchUnreadCount } from "../../redux_thunk/ActorSlice";
+import { requestTopup, buyVip, requestWithdraw, requestAuthorRole } from "../../redux_thunk/UserSlice";
 
 const DEFAULT_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuCZ8869qWy9nQKmjm2nd15yiyLA6AGe5xluCcknNDETI3u69xO53m5s26W5UQqCmU4zyzf11SgtOc3tECHsxH5V-yyIuo5G1XsRxwOdJkLJJ-E34EqbXhTuus-swwxehy7YNJQoWM_0n6aJfm53T0imvlYsBv985pHJm8YP0BjAl-wxnt_WbT9RiW0ec3PrbteyI9lmRFOmnestzuuwUHyeJYbXbouK6ldtyjvVTAByLLhucHQL4W1tFTwUwiw7lHEMjj4URDKWSpg";
 
-import { API_URL } from '../../config/api';
 import { confirmAlert } from '../../utils/confirmAlert';
 
+const BANK_INFO = { bank: 'Vietcombank', account: '1234567890', owner: 'LUMINA APP' };
+
 const VIP_PACKAGES = [
-	{ label: "1 tháng",  xu: 500,   months: 1  },
-	{ label: "3 tháng",  xu: 1200,  months: 3  },
-	{ label: "1 năm",    xu: 4000,  months: 12 },
+	{ label: "1 tháng", xu: 500, months: 1 },
+	{ label: "3 tháng", xu: 1200, months: 3 },
+	{ label: "1 năm", xu: 4000, months: 12 },
 	{ label: "Vĩnh viễn", xu: 10000, months: null },
 ];
 
@@ -33,6 +36,7 @@ const ProfileScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
 	const { user } = useSelector(state => state.auth);
 	const { items: libraryItems } = useSelector(state => state.library);
+	const { unreadCount } = useSelector(state => state.actor);
 
 	const isAuthor = user?.role_id === 2;
 	const isAdmin = user?.role_id === 1;
@@ -41,7 +45,6 @@ const ProfileScreen = ({ navigation }) => {
 	const [topupStep, setTopupStep] = useState(1);
 	const [selectedPkg, setSelectedPkg] = useState(null);
 	const [topupLoading, setTopupLoading] = useState(false);
-	const [unreadCount, setUnreadCount] = useState(0);
 	const [showVip, setShowVip] = useState(false);
 	const [selectedVipPkg, setSelectedVipPkg] = useState(null);
 	const [vipLoading, setVipLoading] = useState(false);
@@ -74,49 +77,23 @@ const ProfileScreen = ({ navigation }) => {
 		if (user?.id) {
 			dispatch(fetchUserProfile(user.id));
 			dispatch(fetchLibrary(user.id));
-			if (user.role_id === 2) {
-				fetch(`${API_URL}/notifications/${user.id}/unread-count`)
-					.then(r => r.json())
-					.then(res => setUnreadCount(res.count || 0))
-					.catch(() => {});
-			}
+			if (user.role_id === 2) dispatch(fetchUnreadCount(user.id));
 		}
 	}, [dispatch, user?.id]);
 
 	const handleLogout = () => {
 		dispatch(logout());
-		const rootNavigation = navigation.getParent();
-		if (rootNavigation) {
-			rootNavigation.reset({
-				index: 0,
-				routes: [{ name: "Guest", state: { routes: [{ name: "LoginTab" }] } }],
-			});
-			return;
-		}
-		Alert.alert("Đăng xuất", "Bạn đã đăng xuất.");
 	};
 
 	const handleTopup = async () => {
 		if (!selectedPkg) return;
 		setTopupLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/topup/request`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ user_id: user.id, amount_vnd: selectedPkg.vnd, amount_xu: selectedPkg.xu }),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				setTopupStep(3);
-			} else {
-				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-		finally { setTopupLoading(false); }
-	};
-
-	const handleBuyVip = () => {
-		setSelectedVipPkg(null);
-		setShowVip(true);
+			await dispatch(requestTopup({ userId: user.id, amountVnd: selectedPkg.vnd, amountXu: selectedPkg.xu })).unwrap();
+			setTopupStep(3);
+		} catch (err) {
+			Alert.alert("Lỗi", err || "Không thể gửi yêu cầu.");
+		} finally { setTopupLoading(false); }
 	};
 
 	const handleConfirmBuyVip = async () => {
@@ -127,20 +104,13 @@ const ProfileScreen = ({ navigation }) => {
 		}
 		setVipLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/users/${user.id}/buy-vip`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ xu: selectedVipPkg.xu, months: selectedVipPkg.months }),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				dispatch(fetchUserProfile(user.id));
-				setShowVip(false);
-				Alert.alert("Thành công", `Đã kích hoạt VIP ${selectedVipPkg.label}!`);
-			} else {
-				Alert.alert("Lỗi", res.message || "Không thể mua VIP.");
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-		finally { setVipLoading(false); }
+			await dispatch(buyVip({ userId: user.id, xu: selectedVipPkg.xu, months: selectedVipPkg.months })).unwrap();
+			dispatch(fetchUserProfile(user.id));
+			setShowVip(false);
+			Alert.alert("Thành công", `Đã kích hoạt VIP ${selectedVipPkg.label}!`);
+		} catch (err) {
+			Alert.alert("Lỗi", err || "Không thể mua VIP.");
+		} finally { setVipLoading(false); }
 	};
 
 	const handleWithdraw = async () => {
@@ -149,35 +119,30 @@ const ProfileScreen = ({ navigation }) => {
 		if (!withdrawAccount.trim()) { Alert.alert("Lỗi", "Vui lòng nhập số tài khoản."); return; }
 		setWithdrawLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/withdraw/request`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					user_id: user.id,
-					amount_xu: xu,
-					bank_name: withdrawBank,
-					bank_account: withdrawAccount,
-					bank_owner: withdrawOwner,
-				}),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				setWithdrawResult(res);
-				setWithdrawStep(2);
-				dispatch(fetchUserProfile(user.id));
-			} else {
-				Alert.alert("Lỗi", res.message || "Không thể gửi yêu cầu.");
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-		finally { setWithdrawLoading(false); }
+			const res = await dispatch(requestWithdraw({
+				userId: user.id,
+				amountXu: xu,
+				bankName: withdrawBank,
+				bankAccount: withdrawAccount,
+				bankOwner: withdrawOwner,
+			})).unwrap();
+			setWithdrawResult(res);
+			setWithdrawStep(2);
+			dispatch(fetchUserProfile(user.id));
+		} catch (err) {
+			Alert.alert("Lỗi", err || "Không thể gửi yêu cầu.");
+		} finally { setWithdrawLoading(false); }
 	};
 
 	const handleRequestAuthor = () => {
 		confirmAlert("Trở thành tác giả", "Gửi yêu cầu lên Admin để được cấp quyền đăng truyện?", async () => {
 			try {
-				const res = await fetch(`${API_URL}/users/${user.id}/request-author`, { method: 'PUT' }).then(r => r.json());
-				Alert.alert(res.status === 'success' ? "Đã gửi" : "Thông báo", res.message);
-				if (res.status === 'success') dispatch(fetchUserProfile(user.id));
-			} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
+				const msg = await dispatch(requestAuthorRole(user.id)).unwrap();
+				Alert.alert("Đã gửi", msg);
+				dispatch(fetchUserProfile(user.id));
+			} catch (err) {
+				Alert.alert("Thông báo", err);
+			}
 		});
 	};
 
@@ -237,7 +202,7 @@ const ProfileScreen = ({ navigation }) => {
 									<MaterialIcons name="add" size={16} color="#FFFFFF" />
 								</TouchableOpacity>
 								{!user?.is_vip && (
-									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#5D2E0C" }]} onPress={handleBuyVip}>
+									<TouchableOpacity style={[styles.vipButton, { flex: 1, backgroundColor: "#5D2E0C" }]} onPress={() => { setSelectedVipPkg(null); setShowVip(true); }}>
 										<Text style={styles.vipButtonText}>Mua VIP</Text>
 										<MaterialIcons name="star" size={16} color="#FFD700" />
 									</TouchableOpacity>
@@ -373,7 +338,7 @@ const ProfileScreen = ({ navigation }) => {
 								? <ActivityIndicator color="#fff" size="small" />
 								: <Text style={styles.topupSubmitText}>
 									{selectedVipPkg ? `Mua ${selectedVipPkg.label} — ${selectedVipPkg.xu.toLocaleString('vi-VN')} xu` : 'Chọn gói VIP'}
-								  </Text>
+								</Text>
 							}
 						</TouchableOpacity>
 						<TouchableOpacity style={styles.backStepBtn} onPress={() => setShowVip(false)}>
@@ -459,8 +424,8 @@ const ProfileScreen = ({ navigation }) => {
 					<View style={styles.sheet}>
 						<View style={styles.sheetHeader}>
 							<Text style={styles.sheetTitle}>
-							{topupStep === 1 ? 'Chọn gói nạp xu' : topupStep === 2 ? 'Thông tin chuyển khoản' : 'Đang chờ xác nhận'}
-						</Text>
+								{topupStep === 1 ? 'Chọn gói nạp xu' : topupStep === 2 ? 'Thông tin chuyển khoản' : 'Đang chờ xác nhận'}
+							</Text>
 							{topupStep !== 3 && (
 								<TouchableOpacity onPress={() => { setShowTopup(false); setTopupStep(1); setSelectedPkg(null); }}>
 									<MaterialIcons name="close" size={22} color="#888888" />

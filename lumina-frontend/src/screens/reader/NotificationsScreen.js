@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
 	SafeAreaView, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useSelector } from "react-redux";
-import { API_URL } from '../../config/api';
+import { useDispatch, useSelector } from "react-redux";
+import { fetchNotifications } from "../../redux_thunk/UserSlice";
+import api from '../../config/axiosInstance';
 
 const NOTIF_ICONS = {
 	story_approved: { name: 'check-circle', color: '#2E7D32' },
@@ -17,24 +18,16 @@ const NOTIF_ICONS = {
 };
 
 const NotificationsScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
 	const { user } = useSelector(s => s.auth);
-	const [notifications, setNotifications] = useState([]);
-	const [loading, setLoading] = useState(true);
-
-	const loadNotifications = useCallback(async () => {
-		if (!user) return;
-		try {
-			const res = await fetch(`${API_URL}/notifications/${user.id}`).then(r => r.json());
-			setNotifications(res.data || []);
-		} catch {} finally { setLoading(false); }
-	}, [user]);
+	const { notifications, notificationsLoading } = useSelector(s => s.user);
 
 	useEffect(() => {
-		loadNotifications();
 		if (user) {
-			fetch(`${API_URL}/notifications/read/${user.id}`, { method: 'PUT' }).catch(() => {});
+			dispatch(fetchNotifications(user.id));
+			api.put(`/notifications/read/${user.id}`).catch(() => {});
 		}
-	}, [loadNotifications, user]);
+	}, [user]);
 
 	const renderItem = ({ item }) => {
 		const icon = NOTIF_ICONS[item.type] || { name: 'notifications', color: '#8B4513' };
@@ -65,7 +58,7 @@ const NotificationsScreen = ({ navigation }) => {
 				<View style={{ width: 40 }} />
 			</View>
 
-			{loading ? (
+			{notificationsLoading ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 			) : notifications.length === 0 ? (
 				<View style={s.center}>

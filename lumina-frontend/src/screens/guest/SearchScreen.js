@@ -1,26 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View, Text, TextInput, TouchableOpacity, FlatList,
 	StyleSheet, SafeAreaView, Image, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCategories } from "../../redux_thunk/StorySlice";
+import { fetchCategories, searchStories } from "../../redux_thunk/StorySlice";
 
-import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
 const PAGE_SIZE = 10;
 
 const SearchScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
-	const { categories } = useSelector(state => state.story);
+	const { categories, searchResults, searchLoading } = useSelector(state => state.story);
 
 	const [query, setQuery] = useState('');
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const [sortBy, setSortBy] = useState('newest');
-	const [results, setResults] = useState([]);
-	const [loading, setLoading] = useState(false);
 	const [searched, setSearched] = useState(false);
 	const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
@@ -30,22 +27,11 @@ const SearchScreen = ({ navigation }) => {
 		dispatch(fetchCategories());
 	}, [dispatch]);
 
-	const doSearch = useCallback(async (searchQuery, catId, sort) => {
-		setLoading(true);
+	const doSearch = (searchQuery, catId, sort) => {
 		setSearched(true);
 		setDisplayCount(PAGE_SIZE);
-		try {
-			let url = `${API_URL}/stories/search?q=${encodeURIComponent(searchQuery || '')}`;
-			if (catId) url += `&category_id=${catId}`;
-			if (sort) url += `&sort=${sort}`;
-			const data = await fetch(url).then(r => r.json());
-			setResults(data.status === "success" ? data.data : []);
-		} catch {
-			setResults([]);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+		dispatch(searchStories({ query: searchQuery || '', categoryId: catId, sortBy: sort }));
+	};
 
 	const handleQueryChange = (text) => {
 		setQuery(text);
@@ -53,18 +39,16 @@ const SearchScreen = ({ navigation }) => {
 		if (text.length > 0) {
 			debounceRef.current = setTimeout(() => doSearch(text, selectedCategory, sortBy), 500);
 		} else {
-			setResults([]);
 			setSearched(false);
 		}
 	};
 
-	// Tự động search khi chọn thể loại hoặc đổi sắp xếp
 	useEffect(() => {
 		if (searched || selectedCategory !== null) doSearch(query, selectedCategory, sortBy);
 	}, [selectedCategory, sortBy]);
 
-	const displayed = results.slice(0, displayCount);
-	const hasMore = displayCount < results.length;
+	const displayed = searchResults.slice(0, displayCount);
+	const hasMore = displayCount < searchResults.length;
 
 	const renderStory = ({ item }) => (
 		<TouchableOpacity
@@ -109,7 +93,7 @@ const SearchScreen = ({ navigation }) => {
 					returnKeyType="search"
 				/>
 				{query.length > 0 && (
-					<TouchableOpacity onPress={() => { setQuery(''); setResults([]); setSearched(false); }}>
+					<TouchableOpacity onPress={() => { setQuery(''); setSearched(false); }}>
 						<MaterialIcons name="close" size={18} color="#BBBBBB" />
 					</TouchableOpacity>
 				)}
@@ -151,11 +135,11 @@ const SearchScreen = ({ navigation }) => {
 				))}
 			</View>
 
-			{loading ? (
+			{searchLoading ? (
 				<View style={styles.center}>
 					<ActivityIndicator size="large" color="#8B4513" />
 				</View>
-			) : searched && results.length === 0 ? (
+			) : searched && searchResults.length === 0 ? (
 				<View style={styles.center}>
 					<MaterialIcons name="search-off" size={48} color="#DDDDDD" />
 					<Text style={styles.emptyText}>Không tìm thấy truyện nào.</Text>
@@ -174,7 +158,7 @@ const SearchScreen = ({ navigation }) => {
 					showsVerticalScrollIndicator={false}
 					ListFooterComponent={hasMore ? (
 						<TouchableOpacity style={styles.loadMoreBtn} onPress={() => setDisplayCount(prev => prev + PAGE_SIZE)}>
-							<Text style={styles.loadMoreText}>Xem thêm ({results.length - displayCount} kết quả)</Text>
+							<Text style={styles.loadMoreText}>Xem thêm ({searchResults.length - displayCount} kết quả)</Text>
 							<MaterialIcons name="expand-more" size={18} color="#8B4513" />
 						</TouchableOpacity>
 					) : null}

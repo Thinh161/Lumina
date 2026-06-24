@@ -4,16 +4,18 @@ import {
 	SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { API_URL } from '../../config/api';
+import { useDispatch, useSelector } from "react-redux";
+import { resetPassword } from "../../redux_thunk/AuthSlice";
 
 const ForgotPasswordScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
+	const { loading } = useSelector(s => s.auth);
 	const [username, setUsername] = useState('');
 	const [email, setEmail] = useState('');
 	const [newPassword, setNewPassword] = useState('');
 	const [confirmPassword, setConfirmPassword] = useState('');
 	const [showNew, setShowNew] = useState(false);
 	const [showConfirm, setShowConfirm] = useState(false);
-	const [loading, setLoading] = useState(false);
 
 	const handleReset = async () => {
 		if (!username.trim() || !email.trim() || !newPassword || !confirmPassword) {
@@ -25,21 +27,17 @@ const ForgotPasswordScreen = ({ navigation }) => {
 		if (newPassword.length < 6) {
 			Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự."); return;
 		}
-		setLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/reset-password`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: username.trim(), email: email.trim().toLowerCase(), new_password: newPassword }),
-			}).then(r => r.json());
-			if (res.status === 'success') {
-				Alert.alert("Thành công", "Mật khẩu đã được đặt lại. Vui lòng đăng nhập lại.");
-				navigation.goBack();
-			} else {
-				Alert.alert("Xác minh thất bại", res.message || "Tên đăng nhập hoặc email không đúng.");
-			}
-		} catch { Alert.alert("Lỗi", "Không thể kết nối máy chủ."); }
-		finally { setLoading(false); }
+			await dispatch(resetPassword({
+				username: username.trim(),
+				email: email.trim().toLowerCase(),
+				newPassword,
+			})).unwrap();
+			Alert.alert("Thành công", "Mật khẩu đã được đặt lại. Vui lòng đăng nhập lại.");
+			navigation.goBack();
+		} catch (err) {
+			Alert.alert("Xác minh thất bại", err);
+		}
 	};
 
 	return (
@@ -120,11 +118,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 							</View>
 						</View>
 
-						<TouchableOpacity
-							style={[s.btn, loading && s.btnDisabled]}
-							onPress={handleReset}
-							disabled={loading}
-						>
+						<TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleReset} disabled={loading}>
 							{loading
 								? <ActivityIndicator color="#fff" size="small" />
 								: <Text style={s.btnText}>Đặt lại mật khẩu</Text>
