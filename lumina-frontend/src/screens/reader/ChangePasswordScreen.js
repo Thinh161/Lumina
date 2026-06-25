@@ -4,16 +4,17 @@ import {
 	SafeAreaView, ScrollView, Alert, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useSelector } from "react-redux";
-
-import { API_URL } from '../../config/api';
+import { useDispatch, useSelector } from "react-redux";
+import { changePassword } from "../../redux_thunk/UserSlice";
 
 const ChangePasswordScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
 	const { user } = useSelector(state => state.auth);
+	const { loading } = useSelector(state => state.user);
+
 	const [oldPass, setOldPass] = useState('');
 	const [newPass, setNewPass] = useState('');
 	const [confirmPass, setConfirmPass] = useState('');
-	const [saving, setSaving] = useState(false);
 	const [showOld, setShowOld] = useState(false);
 	const [showNew, setShowNew] = useState(false);
 
@@ -31,24 +32,16 @@ const ChangePasswordScreen = ({ navigation }) => {
 			return;
 		}
 
-		setSaving(true);
 		try {
-			const res = await fetch(`${API_URL}/users/${user.id}/password`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ old_password: oldPass, new_password: newPass }),
-			}).then(r => r.json());
-
-			if (res.status === "success") {
-				Alert.alert("Thành công", "Đã đổi mật khẩu.");
-				navigation.goBack();
-			} else {
-				Alert.alert("Lỗi", res.message);
-			}
-		} catch {
-			Alert.alert("Lỗi", "Không thể kết nối server.");
-		} finally {
-			setSaving(false);
+			await dispatch(changePassword({
+				userId: user.id,
+				oldPassword: oldPass,
+				newPassword: newPass,
+			})).unwrap();
+			Alert.alert("Thành công", "Đã đổi mật khẩu.");
+			navigation.goBack();
+		} catch (err) {
+			Alert.alert("Lỗi", err);
 		}
 	};
 
@@ -110,11 +103,11 @@ const ChangePasswordScreen = ({ navigation }) => {
 				/>
 
 				<TouchableOpacity
-					style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+					style={[styles.saveBtn, loading && styles.saveBtnDisabled]}
 					onPress={handleChange}
-					disabled={saving}
+					disabled={loading}
 				>
-					{saving ? (
+					{loading ? (
 						<ActivityIndicator color="#fff" size="small" />
 					) : (
 						<Text style={styles.saveBtnText}>Đổi mật khẩu</Text>

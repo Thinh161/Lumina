@@ -4,8 +4,8 @@ import {
 	SafeAreaView, ScrollView, Alert, ActivityIndicator, Platform
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-
-import { API_URL } from '../../config/api';
+import { useDispatch, useSelector } from "react-redux";
+import { addChapter } from "../../redux_thunk/ActorSlice";
 
 const parseDateInput = (str) => {
 	if (!str.trim()) return null;
@@ -17,16 +17,15 @@ const parseDateInput = (str) => {
 
 const AddChapterScreen = ({ navigation, route }) => {
 	const { storyId, storyTitle } = route.params || {};
+	const dispatch = useDispatch();
+	const { savingChap } = useSelector(s => s.actor);
 	const [title, setTitle] = useState('');
 	const [content, setContent] = useState('');
 	const [unlockAt, setUnlockAt] = useState('');
-	const [saving, setSaving] = useState(false);
 	const fileInputRef = useRef(null);
 
 	const handlePickFile = () => {
-		if (Platform.OS === 'web') {
-			fileInputRef.current?.click();
-		}
+		if (Platform.OS === 'web') fileInputRef.current?.click();
 	};
 
 	const handleFileChange = (e) => {
@@ -35,9 +34,7 @@ const AddChapterScreen = ({ navigation, route }) => {
 		const reader = new FileReader();
 		reader.onload = (evt) => {
 			setContent(evt.target.result);
-			if (!title.trim()) {
-				setTitle(file.name.replace(/\.txt$/i, ''));
-			}
+			if (!title.trim()) setTitle(file.name.replace(/\.txt$/i, ''));
 		};
 		reader.readAsText(file, 'UTF-8');
 		e.target.value = '';
@@ -56,37 +53,22 @@ const AddChapterScreen = ({ navigation, route }) => {
 				return;
 			}
 		}
-		setSaving(true);
 		try {
-			const res = await fetch(`${API_URL}/stories/${storyId}/chapters`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: title.trim(), content: content.trim(), unlock_at: unlockDate }),
-			}).then(r => r.json());
-
-			if (res.status === "success") {
-				Alert.alert("Thành công", `Đã thêm Chương ${res.chapter_number}.`);
-				navigation.goBack();
-			} else {
-				Alert.alert("Lỗi", res.message);
-			}
-		} catch {
-			Alert.alert("Lỗi", "Không thể kết nối server.");
-		} finally {
-			setSaving(false);
+			const res = await dispatch(addChapter({
+				storyId,
+				chapData: { title: title.trim(), content: content.trim(), unlock_at: unlockDate },
+			})).unwrap();
+			Alert.alert("Thành công", `Đã thêm Chương ${res.chapter_number}.`);
+			navigation.goBack();
+		} catch (err) {
+			Alert.alert("Lỗi", err);
 		}
 	};
 
 	return (
 		<SafeAreaView style={s.safe}>
 			{Platform.OS === 'web' && (
-				<input
-					type="file"
-					accept=".txt"
-					ref={fileInputRef}
-					style={{ display: 'none' }}
-					onChange={handleFileChange}
-				/>
+				<input type="file" accept=".txt" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
 			)}
 
 			<View style={s.topBar}>
@@ -97,8 +79,8 @@ const AddChapterScreen = ({ navigation, route }) => {
 					<Text style={s.topBarTitle}>Thêm chương mới</Text>
 					<Text style={s.topBarSub} numberOfLines={1}>{storyTitle}</Text>
 				</View>
-				<TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-					{saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Lưu</Text>}
+				<TouchableOpacity style={[s.saveBtn, savingChap && { opacity: 0.6 }]} onPress={handleSave} disabled={savingChap}>
+					{savingChap ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Lưu</Text>}
 				</TouchableOpacity>
 			</View>
 

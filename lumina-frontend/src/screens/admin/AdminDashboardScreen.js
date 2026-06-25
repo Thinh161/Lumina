@@ -5,69 +5,68 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../redux_thunk/AuthSlice';
-import { API_URL } from '../../config/api';
+import {
+	fetchAdminStats, fetchAdminStories, updateStoryStatus,
+	fetchAdminTransactions, fetchAdminUsersOrAuthors,
+	adminSetUserStatus, adminGrantVip, adminRevokeVip,
+	adminApproveAuthor, adminRejectAuthor,
+	adminApproveTopup, adminRejectTopup,
+	adminApproveVip, adminRejectVip,
+	adminApproveWithdraw, adminRejectWithdraw,
+} from '../../redux_thunk/AdminSlice';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const AdminDashboardScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
+	const { 
+		stats: adminStats, 
+		stories, 
+		transactions, 
+		usersList: users, 
+		authorRequests, 
+		loading 
+	} = useSelector(state => state.admin);
+
 	const [tab, setTab] = useState('stories');
 	const [storyFilter, setStoryFilter] = useState('pending');
-	const [pendingStories, setPendingStories] = useState([]);
-	const [filteredStories, setFilteredStories] = useState([]);
-	const [users, setUsers] = useState([]);
-	const [authorRequests, setAuthorRequests] = useState([]);
-	const [topupRequests, setTopupRequests] = useState([]);
 	const [topupFilter, setTopupFilter] = useState('pending');
-	const [vipRequests, setVipRequests] = useState([]);
 	const [vipFilter, setVipFilter] = useState('pending');
-	const [withdrawRequests, setWithdrawRequests] = useState([]);
 	const [withdrawFilter, setWithdrawFilter] = useState('pending');
-	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [rejectTarget, setRejectTarget] = useState(null);
 	const [rejectReason, setRejectReason] = useState('');
 	const [rejecting, setRejecting] = useState(false);
 	const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', onOk: null, destructive: false });
-	const [adminStats, setAdminStats] = useState(null);
 
 	const confirm = (title, msg, onOk, destructive = false) => {
 		setConfirmModal({ visible: true, title, message: msg, onOk, destructive });
 	};
 
 	const loadData = useCallback(async () => {
-		setLoading(true);
 		try {
 			if (tab === 'stories') {
-				if (storyFilter === 'pending') {
-					const res = await fetch(`${API_URL}/admin/stories/pending`).then(r => r.json());
-					setPendingStories(res.data || []);
-				} else {
-					const res = await fetch(`${API_URL}/admin/stories?status=${storyFilter}`).then(r => r.json());
-					setFilteredStories(res.data || []);
-				}
+				await dispatch(fetchAdminStories(storyFilter)).unwrap();
 			} else if (tab === 'authors') {
-				const res = await fetch(`${API_URL}/admin/author-requests`).then(r => r.json());
-				setAuthorRequests(res.data || []);
+				await dispatch(fetchAdminUsersOrAuthors('author-requests')).unwrap();
 			} else if (tab === 'topup') {
-				const res = await fetch(`${API_URL}/admin/topup?status=${topupFilter}`).then(r => r.json());
-				setTopupRequests(res.data || []);
+				await dispatch(fetchAdminTransactions({ type: 'topup', status: topupFilter })).unwrap();
 			} else if (tab === 'vip') {
-				const res = await fetch(`${API_URL}/admin/vip-requests?status=${vipFilter}`).then(r => r.json());
-				setVipRequests(res.data || []);
+				await dispatch(fetchAdminTransactions({ type: 'vip-requests', status: vipFilter })).unwrap();
 			} else if (tab === 'withdraw') {
-				const res = await fetch(`${API_URL}/admin/withdrawals?status=${withdrawFilter}`).then(r => r.json());
-				setWithdrawRequests(res.data || []);
+				await dispatch(fetchAdminTransactions({ type: 'withdrawals', status: withdrawFilter })).unwrap();
 			} else if (tab === 'stats') {
-				const res = await fetch(`${API_URL}/admin/stats`).then(r => r.json());
-				setAdminStats(res.data || null);
+				await dispatch(fetchAdminStats()).unwrap();
 			} else {
-				const res = await fetch(`${API_URL}/admin/users`).then(r => r.json());
-				setUsers((res.data || []).filter(u => u.role_id !== 1));
+				await dispatch(fetchAdminUsersOrAuthors('users')).unwrap();
 			}
-		} finally { setLoading(false); setRefreshing(false); }
-	}, [tab, storyFilter, topupFilter, vipFilter, withdrawFilter]);
+		} catch (error) {
+			Alert.alert("Lỗi", typeof error === 'string' ? error : "Lỗi khi tải dữ liệu");
+		} finally { 
+			setRefreshing(false); 
+		}
+	}, [dispatch, tab, storyFilter, topupFilter, vipFilter, withdrawFilter]);
 
 	useEffect(() => { loadData(); }, [loadData]);
 
@@ -75,30 +74,18 @@ const AdminDashboardScreen = ({ navigation }) => {
 
 	// Load badge counts
 	useEffect(() => {
-		fetch(`${API_URL}/admin/author-requests`).then(r => r.json())
-			.then(res => setAuthorRequests(res.data || [])).catch(() => {});
-		fetch(`${API_URL}/admin/topup`).then(r => r.json())
-			.then(res => setTopupRequests(res.data || [])).catch(() => {});
-		fetch(`${API_URL}/admin/vip-requests`).then(r => r.json())
-			.then(res => setVipRequests(res.data || [])).catch(() => {});
-		fetch(`${API_URL}/admin/withdrawals`).then(r => r.json())
-			.then(res => setWithdrawRequests(res.data || [])).catch(() => {});
-	}, []);
-
-	const apiCall = async (url, options = {}) => {
-		const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
-		const json = await res.json();
-		if (json.status !== 'success') throw new Error(json.message || 'Lỗi không xác định');
-		return json;
-	};
+		dispatch(fetchAdminUsersOrAuthors('author-requests'));
+		dispatch(fetchAdminTransactions({ type: 'topup', status: 'pending' }));
+		dispatch(fetchAdminTransactions({ type: 'vip-requests', status: 'pending' }));
+		dispatch(fetchAdminTransactions({ type: 'withdrawals', status: 'pending' }));
+	}, [dispatch]);
 
 	const handleApprove = (storyId) => confirm(
 		"Duyệt truyện", "Xác nhận duyệt và phát hành truyện này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/stories/${storyId}/status`, { method: 'PUT', body: JSON.stringify({ status: 'published' }) });
-				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+				await dispatch(updateStoryStatus({ storyId, payload: { status: 'published' } })).unwrap();
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -106,12 +93,12 @@ const AdminDashboardScreen = ({ navigation }) => {
 		if (!rejectReason.trim()) { Alert.alert("Lỗi", "Vui lòng nhập lý do từ chối."); return; }
 		setRejecting(true);
 		try {
-			await apiCall(`${API_URL}/admin/stories/${rejectTarget}/status`, {
-				method: 'PUT', body: JSON.stringify({ status: 'rejected', rejection_reason: rejectReason.trim() }),
-			});
+			await dispatch(updateStoryStatus({
+				storyId: rejectTarget,
+				payload: { status: 'rejected', rejection_reason: rejectReason.trim() }
+			})).unwrap();
 			setRejectTarget(null); setRejectReason('');
-			loadData();
-		} catch (e) { Alert.alert("Lỗi", e.message); }
+		} catch (e) { Alert.alert("Lỗi", e); }
 		finally { setRejecting(false); }
 	};
 
@@ -122,9 +109,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 			`Bạn muốn ${newStatus === 'banned' ? 'ban' : 'unban'} người dùng này?`,
 			async () => {
 				try {
-					await apiCall(`${API_URL}/admin/users/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+					await dispatch(adminSetUserStatus({ userId, status: newStatus })).unwrap();
 					loadData();
-				} catch (e) { Alert.alert("Lỗi", e.message); }
+				} catch (e) { Alert.alert("Lỗi", e); }
 			},
 			newStatus === 'banned'
 		);
@@ -134,9 +121,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Cấp VIP", `Cấp VIP vĩnh viễn cho @${username}?`,
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/users/${userId}/vip`, { method: 'PUT' });
+				await dispatch(adminGrantVip(userId)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -144,9 +131,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Thu hồi VIP", `Thu hồi VIP của @${username}?`,
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/users/${userId}/revoke-vip`, { method: 'PUT' });
+				await dispatch(adminRevokeVip(userId)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}, true
 	);
 
@@ -154,9 +141,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Duyệt tác giả", `Cấp quyền Author cho ${name}?`,
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/users/${userId}/approve-author`, { method: 'PUT' });
+				await dispatch(adminApproveAuthor(userId)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -164,9 +151,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Từ chối", "Từ chối yêu cầu tác giả này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/users/${userId}/reject-author`, { method: 'PUT' });
+				await dispatch(adminRejectAuthor(userId)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}, true
 	);
 
@@ -174,9 +161,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Xác nhận nạp xu", "Bạn đã nhận được tiền và muốn cộng xu cho người dùng này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/topup/${id}/approve`, { method: 'PUT' });
+				await dispatch(adminApproveTopup(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -184,9 +171,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Từ chối nạp xu", "Từ chối yêu cầu nạp xu này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/topup/${id}/reject`, { method: 'PUT' });
+				await dispatch(adminRejectTopup(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}, true
 	);
 
@@ -194,9 +181,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Xác nhận VIP", "Bạn đã nhận được thanh toán và muốn cấp VIP cho người dùng này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/vip/${id}/approve`, { method: 'PUT' });
+				await dispatch(adminApproveVip(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -204,9 +191,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Từ chối VIP", "Từ chối yêu cầu mua VIP này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/vip/${id}/reject`, { method: 'PUT' });
+				await dispatch(adminRejectVip(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}, true
 	);
 
@@ -214,9 +201,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Xác nhận rút tiền", "Bạn đã chuyển khoản thành công cho tác giả này?",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/withdraw/${id}/approve`, { method: 'PUT' });
+				await dispatch(adminApproveWithdraw(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}
 	);
 
@@ -224,9 +211,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 		"Từ chối rút tiền", "Từ chối yêu cầu rút tiền? Xu sẽ được hoàn lại.",
 		async () => {
 			try {
-				await apiCall(`${API_URL}/admin/withdraw/${id}/reject`, { method: 'PUT' });
+				await dispatch(adminRejectWithdraw(id)).unwrap();
 				loadData();
-			} catch (e) { Alert.alert("Lỗi", e.message); }
+			} catch (e) { Alert.alert("Lỗi", e); }
 		}, true
 	);
 
@@ -430,14 +417,15 @@ const AdminDashboardScreen = ({ navigation }) => {
 		);
 	};
 
-	const pendingVipCount = vipRequests.filter(r => r.status === 'pending').length;
-	const pendingWithdrawCount = withdrawRequests.filter(r => r.status === 'pending').length;
+	const pendingVipCount = transactions.vip.filter(r => r.status === 'pending').length;
+	const pendingWithdrawCount = transactions.withdraw.filter(r => r.status === 'pending').length;
+	const pendingTopupCount = transactions.topup.filter(r => r.status === 'pending').length;
 
 	const TABS = [
-		{ key: 'stories', label: 'Truyện' },
+		{ key: 'stories', label: `Truyện${stories.pending.length > 0 ? ` (${stories.pending.length})` : ''}` },
 		{ key: 'authors', label: `Tác giả${authorRequests.length > 0 ? ` (${authorRequests.length})` : ''}` },
 		{ key: 'users', label: 'Users' },
-		{ key: 'topup', label: `Nạp xu${topupRequests.filter(r => r.status === 'pending').length > 0 ? ` (${topupRequests.filter(r => r.status === 'pending').length})` : ''}` },
+		{ key: 'topup', label: `Nạp xu${pendingTopupCount > 0 ? ` (${pendingTopupCount})` : ''}` },
 		{ key: 'vip', label: `VIP${pendingVipCount > 0 ? ` (${pendingVipCount})` : ''}` },
 		{ key: 'withdraw', label: `Rút${pendingWithdrawCount > 0 ? ` (${pendingWithdrawCount})` : ''}` },
 		{ key: 'stats', label: 'Thống Kê' },
@@ -494,25 +482,25 @@ const AdminDashboardScreen = ({ navigation }) => {
 			{loading ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 			) : tab === 'stories' ? (
-				displayedStories.length === 0
+				(stories[storyFilter] || []).length === 0
 					? <View style={s.center}><MaterialIcons name="check-circle" size={52} color="#2E7D32" /><Text style={s.emptyText}>Không có truyện nào.</Text></View>
-					: <FlatList data={displayedStories} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+					: <FlatList data={stories[storyFilter]} keyExtractor={i => String(i.id)} renderItem={renderStory} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'authors' ? (
-				authorRequests.length === 0
+				(authorRequests || []).length === 0
 					? <View style={s.center}><MaterialIcons name="person-add-disabled" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu tác giả nào.</Text></View>
 					: <FlatList data={authorRequests} keyExtractor={i => String(i.id)} renderItem={renderAuthorRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'topup' ? (
-				topupRequests.length === 0
+				(transactions.topup || []).length === 0
 					? <View style={s.center}><MaterialIcons name="account-balance-wallet" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu nạp xu nào.</Text></View>
-					: <FlatList data={topupRequests} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+					: <FlatList data={transactions.topup} keyExtractor={i => String(i.id)} renderItem={renderTopupRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'vip' ? (
-				vipRequests.length === 0
+				(transactions.vip || []).length === 0
 					? <View style={s.center}><MaterialIcons name="star-outline" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu VIP nào.</Text></View>
-					: <FlatList data={vipRequests} keyExtractor={i => String(i.id)} renderItem={renderVipRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+					: <FlatList data={transactions.vip} keyExtractor={i => String(i.id)} renderItem={renderVipRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'withdraw' ? (
-				withdrawRequests.length === 0
+				(transactions.withdraw || []).length === 0
 					? <View style={s.center}><MaterialIcons name="account-balance" size={52} color="#EBEBEB" /><Text style={s.emptyText}>Không có yêu cầu rút tiền nào.</Text></View>
-					: <FlatList data={withdrawRequests} keyExtractor={i => String(i.id)} renderItem={renderWithdrawRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
+					: <FlatList data={transactions.withdraw} keyExtractor={i => String(i.id)} renderItem={renderWithdrawRequest} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B4513" />} />
 			) : tab === 'stats' ? (
 				!adminStats
 					? <View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>

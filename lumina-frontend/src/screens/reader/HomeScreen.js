@@ -5,58 +5,46 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchStories, fetchCategories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
+import { fetchStories, fetchCategories, fetchLatestStories, fetchTopStories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
+import { fetchReadingHistory } from "../../redux_thunk/UserSlice";
 
-import { API_URL } from '../../config/api';
 const DEFAULT_IMG = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
 const PAGE_SIZE = 10;
 
 const HomeScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
-	const { stories, categories, loading } = useSelector(s => s.story);
+	const { stories, categories, latestStories, topStories, loading } = useSelector(s => s.story);
 	const { user } = useSelector(s => s.auth);
+	const { history } = useSelector(s => s.user);
 	const [selectedCat, setSelectedCat] = useState(null);
 	const [refreshing, setRefreshing] = useState(false);
-	const [latest, setLatest] = useState([]);
-	const [top, setTop] = useState([]);
-	const [continueReading, setContinueReading] = useState(null);
 	const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
-	const loadSections = useCallback(async () => {
-		try {
-			const [l, t] = await Promise.all([
-				fetch(`${API_URL}/stories/latest`).then(r => r.json()),
-				fetch(`${API_URL}/stories/top`).then(r => r.json()),
-			]);
-			setLatest(l.data || []);
-			setTop(t.data || []);
-		} catch {}
-	}, []);
-
-	const loadContinueReading = useCallback(async () => {
-		if (!user?.id) return;
-		try {
-			const res = await fetch(`${API_URL}/history/${user.id}`).then(r => r.json());
-			if (res.data && res.data.length > 0) setContinueReading(res.data[0]);
-		} catch {}
-	}, [user]);
+	const continueReading = history[0] || null;
 
 	const loadData = useCallback(() => {
 		dispatch(fetchStories());
 		dispatch(fetchCategories());
-		loadSections();
-		loadContinueReading();
-	}, [dispatch, loadSections, loadContinueReading]);
+		dispatch(fetchLatestStories());
+		dispatch(fetchTopStories());
+		if (user?.id) dispatch(fetchReadingHistory(user.id));
+	}, [dispatch, user?.id]);
 
 	useEffect(() => { loadData(); }, [loadData]);
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		setDisplayCount(PAGE_SIZE);
-		await Promise.all([dispatch(fetchStories()), dispatch(fetchCategories()), loadSections(), loadContinueReading()]);
+		await Promise.all([
+			dispatch(fetchStories()),
+			dispatch(fetchCategories()),
+			dispatch(fetchLatestStories()),
+			dispatch(fetchTopStories()),
+			user?.id ? dispatch(fetchReadingHistory(user.id)) : Promise.resolve(),
+		]);
 		setRefreshing(false);
-	}, [dispatch, loadSections, loadContinueReading]);
+	}, [dispatch, user?.id]);
 
 	const handleReadNow = async (storyId) => {
 		try {
@@ -95,7 +83,6 @@ const HomeScreen = ({ navigation }) => {
 				contentContainerStyle={s.scroll}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
 			>
-				{/* Tiếp tục đọc */}
 				{continueReading && (
 					<TouchableOpacity
 						style={s.continueCard}
@@ -140,11 +127,11 @@ const HomeScreen = ({ navigation }) => {
 					</TouchableOpacity>
 				)}
 
-				{latest.length > 0 && (
+				{latestStories.length > 0 && (
 					<>
 						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-							{latest.map(story => (
+							{latestStories.map(story => (
 								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
 									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
 									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
@@ -155,11 +142,11 @@ const HomeScreen = ({ navigation }) => {
 					</>
 				)}
 
-				{top.length > 0 && (
+				{topStories.length > 0 && (
 					<>
 						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-							{top.map(story => (
+							{topStories.map(story => (
 								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
 									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
 									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>

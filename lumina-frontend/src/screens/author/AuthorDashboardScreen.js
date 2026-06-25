@@ -5,21 +5,24 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import {
+	fetchAuthorStories, fetchAuthorStats,
+	fetchStoryChapters, fetchChapterForEdit, fetchUnreadCount,
+	createStory, updateStory, deleteChapter, updateChapter,
+} from "../../redux_thunk/ActorSlice";
+import { fetchCategories } from "../../redux_thunk/StorySlice";
 import { confirmAlert } from "../../utils/confirmAlert";
-
-import { API_URL } from '../../config/api';
 const STATUS_COLOR = { published: "#2E7D32", pending: "#E65100", rejected: "#D32F2F" };
 const STATUS_LABEL = { published: "Đã duyệt", pending: "Chờ duyệt", rejected: "Bị từ chối" };
 
 const AuthorDashboardScreen = ({ navigation, route }) => {
+	const dispatch = useDispatch();
 	const { user } = useSelector(s => s.auth);
-	const [stories, setStories] = useState([]);
-	const [categories, setCategories] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const { stories, stats: authorStats, loading, statsLoading, storyChapters, chapLoading, chapContentLoading, submitting, savingChap, unreadCount } = useSelector(s => s.actor);
+	const { categories } = useSelector(s => s.story);
+
 	const [activeTab, setActiveTab] = useState('stories');
-	const [authorStats, setAuthorStats] = useState(null);
-	const [statsLoading, setStatsLoading] = useState(false);
 
 	// Modal đăng / sửa truyện
 	const [showStoryModal, setShowStoryModal] = useState(false);
@@ -30,54 +33,34 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const [stCatIds, setStCatIds] = useState([]);
 	const [stPriceXu, setStPriceXu] = useState('');
 	const [stIsPaid, setStIsPaid] = useState(false);
-	const [submitting, setSubmitting] = useState(false);
-
 	// Modal quản lý chương
 	const [managingStory, setManagingStory] = useState(null);
-	const [storyChapters, setStoryChapters] = useState([]);
-	const [chapLoading, setChapLoading] = useState(false);
 
 	// Modal sửa chương
 	const [editingChapter, setEditingChapter] = useState(null);
 	const [chapTitle, setChapTitle] = useState('');
 	const [chapContent, setChapContent] = useState('');
 	const [chapUnlockAt, setChapUnlockAt] = useState('');
-	const [savingChap, setSavingChap] = useState(false);
-	const [chapContentLoading, setChapContentLoading] = useState(false);
-	const [unreadCount, setUnreadCount] = useState(0);
 	const fileInputRef = useRef(null);
 
-	const loadUnreadCount = useCallback(async () => {
-		if (!user) return;
-		try {
-			const res = await fetch(`${API_URL}/notifications/${user.id}/unread-count`).then(r => r.json());
-			setUnreadCount(res.count || 0);
-		} catch {}
-	}, [user]);
+	const loadData = useCallback(() => {
+		if (user?.id) {
+			dispatch(fetchAuthorStories(user.id));
+			dispatch(fetchCategories());
+		}
+	}, [dispatch, user]);
 
-	const loadData = useCallback(async () => {
-		setLoading(true);
-		try {
-			const [sr, cr] = await Promise.all([
-				fetch(`${API_URL}/author/stories/${user.id}`).then(r => r.json()),
-				fetch(`${API_URL}/categories`).then(r => r.json()),
-			]);
-			setStories(sr.data || []);
-			setCategories(cr.data || []);
-		} finally { setLoading(false); }
-	}, [user]);
-
-	useEffect(() => { loadData(); loadUnreadCount(); }, [loadData, loadUnreadCount]);
+	useEffect(() => {
+		loadData();
+		if (user?.id) dispatch(fetchUnreadCount(user.id));
+	}, [loadData]);
 	useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-	const loadStats = useCallback(async () => {
-		if (!user?.id) return;
-		setStatsLoading(true);
-		try {
-			const res = await fetch(`${API_URL}/author/${user.id}/stats`).then(r => r.json());
-			if (res.status === 'success') setAuthorStats(res.data);
-		} finally { setStatsLoading(false); }
-	}, [user?.id]);
+	const loadStats = useCallback(() => {
+		if (user?.id) {
+			dispatch(fetchAuthorStats(user.id));
+		}
+	}, [dispatch, user]);
 
 	useEffect(() => { if (activeTab === 'income') loadStats(); }, [activeTab, loadStats]);
 
@@ -103,44 +86,27 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 		if (!stTitle.trim() || stCatIds.length === 0) { Alert.alert("Lỗi", "Cần nhập tên và chọn ít nhất 1 thể loại."); return; }
 		const priceVal = stIsPaid ? (parseInt(stPriceXu) || 0) : 0;
 		if (stIsPaid && priceVal < 100) { Alert.alert("Lỗi", "Giá tối thiểu là 100 xu."); return; }
-		setSubmitting(true);
 		try {
-			let res;
 			if (editingStory) {
-				res = await fetch(`${API_URL}/stories/${editingStory.id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: priceVal }),
-				}).then(r => r.json());
+				await dispatch(updateStory({ storyId: editingStory.id, storyData: { title: stTitle, description: stDesc, thumbnail: stThumb, category_ids: stCatIds, price_xu: priceVal } })).unwrap();
 			} else {
-				res = await fetch(`${API_URL}/stories`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: priceVal }),
-				}).then(r => r.json());
+				await dispatch(createStory({ title: stTitle, description: stDesc, thumbnail: stThumb, author_id: user.id, category_ids: stCatIds, price_xu: priceVal })).unwrap();
 			}
-			if (res.status === "success") {
-				Alert.alert("Thành công", editingStory ? "Đã cập nhật truyện." : "Truyện đang chờ kiểm duyệt.");
-				setShowStoryModal(false);
-				loadData();
-			} else Alert.alert("Lỗi", res.message);
-		} catch { Alert.alert("Lỗi", "Không thể kết nối."); } finally { setSubmitting(false); }
+			Alert.alert("Thành công", editingStory ? "Đã cập nhật truyện." : "Truyện đang chờ kiểm duyệt.");
+			setShowStoryModal(false);
+			loadData();
+		} catch (err) { Alert.alert("Lỗi", err || "Không thể kết nối."); }
 	};
 
-	const openChapterManager = async (story) => {
+	const openChapterManager = (story) => {
 		setManagingStory(story);
-		setChapLoading(true);
-		try {
-			const res = await fetch(`${API_URL}/stories/${story.id}/chapters`).then(r => r.json());
-			setStoryChapters(res.data || []);
-		} finally { setChapLoading(false); }
+		dispatch(fetchStoryChapters(story.id));
 	};
 
 	const handleDeleteChapter = (chapter) => {
 		confirmAlert("Xóa chương", `Xóa "Chương ${chapter.chapter_number}: ${chapter.title}"?`, async () => {
 			try {
-				await fetch(`${API_URL}/chapters/${chapter.id}`, { method: 'DELETE' });
-				setStoryChapters(prev => prev.filter(c => c.id !== chapter.id));
+				await dispatch(deleteChapter(chapter.id)).unwrap();
 				loadData();
 			} catch { Alert.alert("Lỗi", "Không thể xóa chương."); }
 		}, true);
@@ -157,7 +123,6 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 	const openEditChapter = async (chapter) => {
 		setEditingChapter(chapter);
 		setChapTitle(chapter.title || '');
-		// Hiển thị unlock_at theo DD/MM/YYYY nếu có
 		if (chapter.unlock_at) {
 			const d = new Date(chapter.unlock_at);
 			setChapUnlockAt(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
@@ -165,11 +130,10 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 			setChapUnlockAt('');
 		}
 		setChapContent('');
-		setChapContentLoading(true);
 		try {
-			const res = await fetch(`${API_URL}/chapters/${chapter.id}?user_id=${user.id}`).then(r => r.json());
-			if (res.status === 'success') setChapContent(res.data.content || '');
-		} catch {} finally { setChapContentLoading(false); }
+			const content = await dispatch(fetchChapterForEdit({ chapterId: chapter.id, userId: user.id })).unwrap();
+			setChapContent(content);
+		} catch {}
 	};
 
 	const handleFileChange = (e) => {
@@ -188,20 +152,11 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 			unlockDate = parseDateInput(chapUnlockAt);
 			if (!unlockDate) { Alert.alert("Lỗi", "Định dạng ngày không hợp lệ. Dùng DD/MM/YYYY."); return; }
 		}
-		setSavingChap(true);
 		try {
-			const res = await fetch(`${API_URL}/chapters/${editingChapter.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: chapTitle, content: chapContent, unlock_at: unlockDate }),
-			}).then(r => r.json());
-			if (res.status === "success") {
-				const newUnlockAt = chapUnlockAt.trim() ? parseDateInput(chapUnlockAt) : null;
-				setStoryChapters(prev => prev.map(c => c.id === editingChapter.id ? { ...c, title: chapTitle, unlock_at: newUnlockAt } : c));
-				setEditingChapter(null);
-				Alert.alert("Đã lưu", "Chương đã được cập nhật.");
-			} else Alert.alert("Lỗi", res.message);
-		} catch { Alert.alert("Lỗi", "Không thể kết nối."); } finally { setSavingChap(false); }
+			await dispatch(updateChapter({ chapterId: editingChapter.id, userId: user.id, chapData: { title: chapTitle, content: chapContent, unlock_at: unlockDate } })).unwrap();
+			setEditingChapter(null);
+			Alert.alert("Đã lưu", "Chương đã được cập nhật.");
+		} catch (err) { Alert.alert("Lỗi", err || "Không thể kết nối."); }
 	};
 
 	const renderStory = ({ item }) => (
@@ -251,7 +206,7 @@ const AuthorDashboardScreen = ({ navigation, route }) => {
 					</View>
 				</View>
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-					<TouchableOpacity style={s.bellBtn} onPress={() => { setUnreadCount(0); navigation.navigate("Notifications"); }}>
+					<TouchableOpacity style={s.bellBtn} onPress={() => navigation.navigate("Notifications")}>
 						<MaterialIcons name="notifications" size={22} color="#8B4513" />
 						{unreadCount > 0 && (
 							<View style={s.badge}>

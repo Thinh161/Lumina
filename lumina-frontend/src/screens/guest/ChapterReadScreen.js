@@ -14,9 +14,9 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchChapterContent, clearChapterContent } from "../../redux_thunk/StorySlice";
+import { fetchChapterContent, clearChapterContent, saveBookmark } from "../../redux_thunk/StorySlice";
 import { addToLibrary, removeFromLibrary, fetchLibrary } from "../../redux_thunk/LibrarySlice";
-import { API_URL } from '../../config/api';
+import api from '../../config/axiosInstance';
 
 const FONT_SIZES = [14, 16, 18, 20];
 const THEMES = {
@@ -63,15 +63,9 @@ const ChapterReadScreen = ({ navigation, route }) => {
 		setFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.length]);
 	};
 
-	const saveBookmark = async (position) => {
+	const handleSaveBookmark = (position) => {
 		if (!user || !chapterId) return;
-		try {
-			await fetch(`${API_URL}/bookmarks`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ user_id: user.id, chapter_id: chapterId, scroll_position: Math.round(position) }),
-			});
-		} catch {}
+		dispatch(saveBookmark({ userId: user.id, chapterId, scrollPosition: position }));
 	};
 
 	useEffect(() => {
@@ -80,7 +74,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 			dispatch(fetchChapterContent({ chapterId, userId: user?.id }));
 		}
 		return () => {
-			saveBookmark(scrollPositionRef.current);
+			handleSaveBookmark(scrollPositionRef.current);
 			dispatch(clearChapterContent());
 		};
 	}, [dispatch, chapterId]);
@@ -156,11 +150,7 @@ const ChapterReadScreen = ({ navigation, route }) => {
 						setProgress(p);
 						if (p >= 0.8 && !viewCountedRef.current) {
 							viewCountedRef.current = true;
-							fetch(`${API_URL}/chapters/${chapterId}/view`, {
-								method: 'PUT',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ user_id: user?.id || null }),
-							}).catch(() => {});
+							api.put(`/chapters/${chapterId}/view`, { user_id: user?.id || null }).catch(() => {});
 						}
 					}}
 					scrollEventThrottle={200}

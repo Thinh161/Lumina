@@ -1,30 +1,29 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View, Text, FlatList, TouchableOpacity, StyleSheet,
 	SafeAreaView, ActivityIndicator, Image, RefreshControl
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchReadingHistory } from "../../redux_thunk/UserSlice";
 
-import { API_URL } from '../../config/api';
 const DEFAULT_COVER = "https://i.pravatar.cc/150?img=5";
 
 const ReadingHistoryScreen = ({ navigation }) => {
+	const dispatch = useDispatch();
 	const { user } = useSelector(state => state.auth);
-	const [history, setHistory] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const { history, historyLoading } = useSelector(state => state.user);
 	const [refreshing, setRefreshing] = useState(false);
 
-	const loadHistory = useCallback(async () => {
-		if (!user) return;
-		setLoading(true);
-		try {
-			const res = await fetch(`${API_URL}/history/${user.id}`).then(r => r.json());
-			setHistory(res.data || []);
-		} catch {} finally { setLoading(false); }
+	useEffect(() => {
+		if (user) dispatch(fetchReadingHistory(user.id));
 	}, [user]);
 
-	useEffect(() => { loadHistory(); }, [loadHistory]);
+	const handleRefresh = async () => {
+		setRefreshing(true);
+		await dispatch(fetchReadingHistory(user.id));
+		setRefreshing(false);
+	};
 
 	const renderItem = ({ item }) => (
 		<TouchableOpacity
@@ -61,7 +60,7 @@ const ReadingHistoryScreen = ({ navigation }) => {
 				<Text style={s.headerTitle}>Lịch sử đọc</Text>
 			</View>
 
-			{loading ? (
+			{historyLoading && !refreshing ? (
 				<View style={s.center}><ActivityIndicator size="large" color="#8B4513" /></View>
 			) : history.length === 0 ? (
 				<View style={s.center}>
@@ -75,7 +74,14 @@ const ReadingHistoryScreen = ({ navigation }) => {
 					renderItem={renderItem}
 					contentContainerStyle={{ padding: 16, gap: 12 }}
 					showsVerticalScrollIndicator={false}
-					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await loadHistory(); setRefreshing(false); }} colors={["#8B4513"]} tintColor="#8B4513" />}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={handleRefresh}
+							colors={["#8B4513"]}
+							tintColor="#8B4513"
+						/>
+					}
 				/>
 			)}
 		</SafeAreaView>

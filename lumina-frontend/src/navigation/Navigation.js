@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useSelector } from "react-redux";
 
 import HomeGuestScreen from "../screens/guest/HomeGuestScreen";
 import StoryDetailScreen from "../screens/guest/StoryDetailScreen";
@@ -122,20 +123,33 @@ const GuestTabs = () => {
 };
 
 const Navigation = () => {
+	const { user } = useSelector(state => state.auth);
+
 	return (
 		<NavigationContainer>
-			<Stack.Navigator
-				initialRouteName="Guest"
-				screenOptions={{ headerShown: false }}
-			>
-				<Stack.Screen name="Guest" component={GuestTabs} />
-				<Stack.Screen name="Login" component={LoginScreen} />
-				<Stack.Screen name="Register" component={RegisterScreen} />
-				<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-				<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
-				<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
-				<Stack.Screen name="Reader" component={UserNavigation} />
-				<Stack.Screen name="Admin" component={AdminDashboardScreen} />
+			<Stack.Navigator screenOptions={{ headerShown: false }}>
+				{!user ? (
+					<>
+						<Stack.Screen name="Guest" component={GuestTabs} />
+						<Stack.Screen name="Login" component={LoginScreen} />
+						<Stack.Screen name="Register" component={RegisterScreen} />
+						<Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+						<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
+						<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
+					</>
+				) : user.role_id === 1 ? (
+					<>
+						<Stack.Screen name="Admin" component={AdminDashboardScreen} />
+						<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
+						<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
+					</>
+				) : (
+					<>
+						<Stack.Screen name="Reader" component={UserNavigation} />
+						<Stack.Screen name="ChapterRead" component={ChapterReadScreen} />
+						<Stack.Screen name="StoryDetail" component={StoryDetailScreen} />
+					</>
+				)}
 			</Stack.Navigator>
 			<GlobalConfirmModal />
 		</NavigationContainer>

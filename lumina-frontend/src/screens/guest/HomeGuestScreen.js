@@ -5,41 +5,35 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchStories, fetchCategories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
+import { fetchStories, fetchCategories, fetchLatestStories, fetchTopStories, fetchStoryDetails, fetchChapters } from "../../redux_thunk/StorySlice";
 
-import { API_URL } from '../../config/api';
 const DEFAULT_IMG = "https://lh3.googleusercontent.com/aida-public/AB6AXuD00yC-OnoCjJ9ZHaMrK26WR4nYqz0nk2iS7pDgV0ssTgw8yFCTDNtMUsY1PrTvNBcw6wSxrSiSTkZTqnqAffNyZ0UIKtGPXkVOT77r7Y5TCsZMjHWTTyxy49Hp18b4ugO9E7i3qYa1gH-kS7MEW9AsnlKK7f4oUBV50yuyj9NieHkFkbdHT8t6AlHwcNHmlOj9Ne21nhGlD1SZYbDdfw3l59bzcFB8gpWyHi_X8AT90teA3r5Xw3F45xnRt2FS-wrNbF-Kja0tdXc";
 
 const HomeGuestScreen = ({ navigation }) => {
 	const dispatch = useDispatch();
-	const { stories, categories, loading } = useSelector(s => s.story);
+	const { stories, categories, latestStories, topStories, loading } = useSelector(s => s.story);
 	const [selectedCat, setSelectedCat] = useState(null);
 	const [refreshing, setRefreshing] = useState(false);
-	const [latest, setLatest] = useState([]);
-	const [top, setTop] = useState([]);
 
-	const loadSections = useCallback(async () => {
-		try {
-			const [l, t] = await Promise.all([
-				fetch(`${API_URL}/stories/latest`).then(r => r.json()),
-				fetch(`${API_URL}/stories/top`).then(r => r.json()),
-			]);
-			setLatest(l.data || []);
-			setTop(t.data || []);
-		} catch {}
-	}, []);
-
-	useEffect(() => {
+	const loadData = useCallback(() => {
 		dispatch(fetchStories());
 		dispatch(fetchCategories());
-		loadSections();
-	}, [dispatch, loadSections]);
+		dispatch(fetchLatestStories());
+		dispatch(fetchTopStories());
+	}, [dispatch]);
+
+	useEffect(() => { loadData(); }, [loadData]);
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
-		await Promise.all([dispatch(fetchStories()), dispatch(fetchCategories()), loadSections()]);
+		await Promise.all([
+			dispatch(fetchStories()),
+			dispatch(fetchCategories()),
+			dispatch(fetchLatestStories()),
+			dispatch(fetchTopStories()),
+		]);
 		setRefreshing(false);
-	}, [dispatch, loadSections]);
+	}, [dispatch]);
 
 	const handleReadNow = async (storyId) => {
 		try {
@@ -61,7 +55,6 @@ const HomeGuestScreen = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={s.safe}>
-			{/* Header */}
 			<View style={s.header}>
 				<View>
 					<Text style={s.appName}>Lumina</Text>
@@ -73,40 +66,24 @@ const HomeGuestScreen = ({ navigation }) => {
 			</View>
 
 			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}
-			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
-		>
-
-				{/* Category chips */}
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#8B4513"]} tintColor="#8B4513" />}
+			>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
-					<TouchableOpacity
-						style={[s.chip, !selectedCat && s.chipActive]}
-						onPress={() => setSelectedCat(null)}
-					>
+					<TouchableOpacity style={[s.chip, !selectedCat && s.chipActive]} onPress={() => setSelectedCat(null)}>
 						<Text style={[s.chipText, !selectedCat && s.chipTextActive]}>Tất cả</Text>
 					</TouchableOpacity>
 					{categories.map(c => (
-						<TouchableOpacity
-							key={c.id}
-							style={[s.chip, selectedCat === c.id && s.chipActive]}
-							onPress={() => setSelectedCat(selectedCat === c.id ? null : c.id)}
-						>
+						<TouchableOpacity key={c.id} style={[s.chip, selectedCat === c.id && s.chipActive]} onPress={() => setSelectedCat(selectedCat === c.id ? null : c.id)}>
 							<Text style={[s.chipText, selectedCat === c.id && s.chipTextActive]}>{c.name}</Text>
 						</TouchableOpacity>
 					))}
 				</ScrollView>
 
-				{/* Featured — first story big */}
 				{filtered[0] && (
-					<TouchableOpacity
-						style={s.featured}
-						onPress={() => navigation.navigate("StoryDetail", { storyId: filtered[0].id })}
-						activeOpacity={0.9}
-					>
+					<TouchableOpacity style={s.featured} onPress={() => navigation.navigate("StoryDetail", { storyId: filtered[0].id })} activeOpacity={0.9}>
 						<Image source={{ uri: filtered[0].cover_image || DEFAULT_IMG }} style={s.featuredImg} />
 						<View style={s.featuredInfo}>
-							<View style={s.catTag}>
-								<Text style={s.catTagText}>{filtered[0].category_names}</Text>
-							</View>
+							<View style={s.catTag}><Text style={s.catTagText}>{filtered[0].category_names}</Text></View>
 							<Text style={s.featuredTitle} numberOfLines={2}>{filtered[0].title}</Text>
 							<Text style={s.featuredAuthor}>{filtered[0].author_name}</Text>
 							<TouchableOpacity style={s.readBtn} onPress={() => handleReadNow(filtered[0].id)}>
@@ -117,58 +94,50 @@ const HomeGuestScreen = ({ navigation }) => {
 					</TouchableOpacity>
 				)}
 
-			{latest.length > 0 && (
-				<>
-					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-						{latest.map(story => (
-							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
-								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
-								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
-								<Text style={s.hAuthor} numberOfLines={1}>{story.author_name}</Text>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
-				</>
-			)}
+				{latestStories.length > 0 && (
+					<>
+						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Mới nhất</Text></View>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+							{latestStories.map(story => (
+								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+									<Text style={s.hAuthor} numberOfLines={1}>{story.author_name}</Text>
+								</TouchableOpacity>
+							))}
+						</ScrollView>
+					</>
+				)}
 
-			{top.length > 0 && (
-				<>
-					<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
-						{top.map(story => (
-							<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
-								<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
-								<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
-								<View style={s.hViews}><MaterialIcons name="visibility" size={10} color="#8B4513" /><Text style={s.hViewText}>{story.views || 0}</Text></View>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
-				</>
-			)}
+				{topStories.length > 0 && (
+					<>
+						<View style={s.sectionHeader}><Text style={s.sectionTitle}>Xem nhiều nhất</Text></View>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hList}>
+							{topStories.map(story => (
+								<TouchableOpacity key={story.id} style={s.hCard} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
+									<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.hCover} />
+									<Text style={s.hTitle} numberOfLines={2}>{story.title}</Text>
+									<View style={s.hViews}><MaterialIcons name="visibility" size={10} color="#8B4513" /><Text style={s.hViewText}>{story.views || 0}</Text></View>
+								</TouchableOpacity>
+							))}
+						</ScrollView>
+					</>
+				)}
 
-				{/* Story list */}
 				<View style={s.sectionHeader}>
 					<Text style={s.sectionTitle}>Tất cả truyện</Text>
 					<Text style={s.sectionCount}>{filtered.length} truyện</Text>
 				</View>
 
 				{filtered.map(story => (
-					<TouchableOpacity
-						key={story.id}
-						style={s.card}
-						onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })}
-						activeOpacity={0.85}
-					>
+					<TouchableOpacity key={story.id} style={s.card} onPress={() => navigation.navigate("StoryDetail", { storyId: story.id })} activeOpacity={0.85}>
 						<Image source={{ uri: story.cover_image || DEFAULT_IMG }} style={s.cardImg} />
 						<View style={s.cardInfo}>
 							<Text style={s.cardTitle} numberOfLines={2}>{story.title}</Text>
 							<Text style={s.cardAuthor} numberOfLines={1}>{story.author_name}</Text>
 							<View style={s.cardMeta}>
 								<View style={s.catPill}><Text style={s.catPillText}>{story.category_names}</Text></View>
-								<Text style={s.views}>
-									<MaterialIcons name="visibility" size={11} color="#BBBBBB" /> {story.views || 0}
-								</Text>
+								<Text style={s.views}><MaterialIcons name="visibility" size={11} color="#BBBBBB" /> {story.views || 0}</Text>
 							</View>
 							<Text style={s.cardDesc} numberOfLines={2}>{story.description}</Text>
 						</View>
